@@ -1,0 +1,16 @@
+[Unit]
+Description=Load custom gs_usb.ko for DM-USB2CANFD_Dual
+DefaultDependencies=no
+After=systemd-modules-load.service local-fs.target
+Before=sysinit.target network-pre.target
+Wants=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/sbin/modprobe -r gs_usb
+ExecStart=/sbin/insmod __GS_USB_KO__
+ExecStop=-/sbin/modprobe -r gs_usb
+
+[Install]
+WantedBy=sysinit.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Configure CAN FD interface %i (1M arbitration / 5M data / FD on)
+BindsTo=sys-subsystem-net-devices-%i.device
+After=sys-subsystem-net-devices-%i.device d1-gs-usb.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/sbin/ip link set %i down
+ExecStart=/sbin/ip link set %i type can bitrate 1000000 dbitrate 5000000 sample-point 0.75 dsample-point 0.875 fd on
+ExecStartPost=/sbin/ip link set %i up
+ExecStop=-/sbin/ip link set %i down

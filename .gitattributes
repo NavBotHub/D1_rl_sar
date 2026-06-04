@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.ico binary
+*.STL binary
+*.stl binary
+*.onnx binary
+*.apk binary
+*.a binary
+*.so binary
+*.dll binary
+*.lib binary
+*.zip binary
+*.tar binary
+*.gz binary

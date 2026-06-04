@@ -1,0 +1,2 @@
+在ros1 环境中，直接使用ros安装的serial功能包(不能在/src中放入ros2的serial)
+在ros2 环境中，需要下载ros2专用serial功能包，并放入/src

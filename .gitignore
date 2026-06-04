@@ -1,0 +1,89 @@
+﻿# --- OS / editor ---
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+.marscode/
+*.swp
+*.swo
+*~
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- CMake / build artifacts (generic) ---
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+# Do not ignore source Makefiles such as 5.15/Makefile.
+**/build/**/Makefile
+**/cmake_build/**/Makefile
+compile_commands.json
+*.cmake.user
+
+# --- Catkin (ROS1) ---
+devel/
+logs/
+.catkin_tools/
+
+# --- Colcon (ROS2) ---
+install/
+log/
+
+# --- Project specific common outputs ---
+rl_sar/cmake_build/
+rl_sar/**/cmake_build/
+
+# Some submodules/examples may generate their own build dirs
+**/cmake_build/
+**/bazel-*
+**/bazel-bin/
+**/bazel-out/
+**/bazel-testlogs/
+
+# --- Runtime logs / dumps ---
+*.log
+*.tmp
+*.bak
+*.bak_*
+*.orig
+*.core
+core
+
+# --- Large/generated simulation data ---
+*.csv
+*.CSV
+MUJOCO_LOG.TXT
+rl_sar/mujoco_*.txt
+rl_sar/*_probe.py
+
+# --- Third-party libraries (very large binaries) ---
+# Keep these out of git; download/install separately if needed.
+rl_sar/library/
+
+
+# --- Kernel module build outputs ---
+5.15/*.cmd
+5.15/*.o
+5.15/*.ko
+5.15/*.mod
+5.15/*.mod.c
+5.15/Module.symvers
+5.15/modules.order
