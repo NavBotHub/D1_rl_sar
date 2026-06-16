@@ -48,7 +48,19 @@ detect_jetpack_version() {
     # Try to get version from nv_tegra_release
     if [ -f /etc/nv_tegra_release ]; then
         # Example: "# R35 (release), REVISION: 4.1"
-        jetpack_version=$(grep -oP 'R\K[0-9]+' /etc/nv_tegra_release | head -1)
+        local l4t_release=$(grep -oP 'R\K[0-9]+' /etc/nv_tegra_release | head -1)
+        local l4t_revision=$(grep -oP 'REVISION:\s*\K[0-9]+' /etc/nv_tegra_release | head -1)
+        if [ -n "$l4t_release" ]; then
+            if [ "$l4t_release" = "36" ]; then
+                if [ -n "$l4t_revision" ] && [ "$l4t_revision" -ge 4 ]; then
+                    jetpack_version="61"
+                else
+                    jetpack_version="60"
+                fi
+            else
+                jetpack_version=$l4t_release
+            fi
+        fi
     fi
 
     # Try alternative method using dpkg
@@ -87,6 +99,14 @@ get_pytorch_wheel_url() {
 
     # Map JetPack version to PyTorch wheel
     case "$jetpack_ver" in
+        61|62)
+            # JetPack 6.1/6.2 (L4T R36.4+) - PyTorch 2.5.0
+            wheel_url="https://developer.download.nvidia.cn/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp${python_version}-cp${python_version}-linux_aarch64.whl"
+            ;;
+        60)
+            # JetPack 6.0 (L4T R36.2/R36.3) - PyTorch 2.4.0
+            wheel_url="https://developer.download.nvidia.cn/compute/redist/jp/v60/pytorch/torch-2.4.0a0+f70bd71a48.nv24.06.15634931-cp${python_version}-cp${python_version}-linux_aarch64.whl"
+            ;;
         35)
             # JetPack 5.1.x (L4T R35.x) - PyTorch 2.1.0
             wheel_url="https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp${python_version}-cp${python_version}-linux_aarch64.whl"
@@ -101,7 +121,7 @@ get_pytorch_wheel_url() {
             ;;
         *)
             # Default to JetPack 5.1.2 for unknown versions
-            print_warning "Unknown JetPack version: R${jetpack_ver}, using default PyTorch 2.1.0"
+            print_warning "Unknown JetPack version: R${jetpack_ver}, using default PyTorch 2.1.0" >&2
             wheel_url="https://developer.download.nvidia.cn/compute/redist/jp/v512/pytorch/torch-2.1.0a0+41361538.nv23.06-cp${python_version}-cp${python_version}-linux_aarch64.whl"
             ;;
     esac
@@ -336,4 +356,3 @@ main() {
 
 # Run main function
 main "$@"
-

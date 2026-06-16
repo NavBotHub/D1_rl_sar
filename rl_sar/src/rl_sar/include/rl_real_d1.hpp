@@ -91,6 +91,12 @@ private:
     void ApplyDogUsbControl(bool emit_events);
     bool DogUsbShouldBlockFallback() const;
     void TriggerDogUsbGamepad(Input::Gamepad gamepad, const char* name);
+    void RequestDogUsbExit(const char* reason);
+    void HoldDogUsbExitInputs();
+    void UpdateDogUsbExitShutdown();
+    void ShutdownDogUsbExitIfReady();
+    bool DogUsbExitTimedOut() const;
+    std::string CurrentFsmStateName() const;
     void LogDogUsbStatus(bool safe_state, bool usb_timeout, bool remote_timeout, bool serial_connected);
     // loop
     std::shared_ptr<LoopFunc> loop_keyboard;
@@ -146,6 +152,8 @@ private:
     int sys_js_max_value = (1 << (16 - 1));
     void SetupSysJoystick(const std::string& device, int bits);
     void GetSysJoystick();
+    bool keyboard_enable = true;
+    std::string sys_joystick_device = "/dev/input/js0";
 
     // dog USB DOG_CTRL input
     std::unique_ptr<DogUsbReceiver> dog_usb_receiver;
@@ -155,6 +163,13 @@ private:
     int dog_usb_timeout_ms = 300;
     int dog_remote_timeout_ms = 1500;
     bool dog_usb_allow_fallback = false;
+    bool dog_usb_l1_off_exit = false;
+    int dog_usb_l1_button_bit = 8;
+    int dog_usb_l1_exit_timeout_ms = 8000;
+    bool dog_usb_l1_seen_on = false;
+    bool dog_usb_exit_requested = false;
+    bool dog_usb_exit_shutdown_after_command = false;
+    std::chrono::steady_clock::time_point dog_usb_exit_started_at{};
     bool dog_usb_has_taken_control = false;
     uint16_t dog_usb_prev_buttons = 0;
     bool dog_usb_status_initialized = false;

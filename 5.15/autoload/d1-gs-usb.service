@@ -8,9 +8,8 @@ Wants=systemd-modules-load.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=-/sbin/modprobe -r gs_usb
-ExecStart=/sbin/insmod __GS_USB_KO__
-ExecStop=-/sbin/modprobe -r gs_usb
+ExecStart=/bin/sh -c '/sbin/lsmod | /bin/grep -q "^gs_usb " || /sbin/insmod __GS_USB_KO__'
+ExecStop=-/sbin/rmmod gs_usb
 
 [Install]
 WantedBy=sysinit.target

@@ -1,12 +1,20 @@
-﻿// 鎵嬫焺鏄犲皠娴嬭瘯绋嬪簭
+// 手柄映射测试程序
 //
-// 鐢ㄩ€旓細鍦ㄤ笉鍚姩鏁翠釜 rl_real_d1 鐨勬儏鍐典笅锛屽崟鐙獙璇?/dev/input/js0
-//      鐨勬寜閿?杞寸紪鍙锋槸鍚︿笌 rl_real_d1.cpp 涓?GetSysJoystick() 鐨勬槧灏勪竴鑷淬€?//
-// 鏋勫缓锛歜ash build-test-mapping.sh
-// 杩愯锛?/test_mapping              浣跨敤榛樿 /dev/input/js0
+// 用途：在不启动整个 rl_real_dmgo 的情况下，单独验证 /dev/input/js0
+//      的按键/轴编号是否与 rl_real_dmgo.cpp 中 GetSysJoystick() 的映射一致。
+//
+// 构建：bash build-test-mapping.sh
+// 运行：./test_mapping              使用默认 /dev/input/js0
 //      ./test_mapping /dev/input/js0
 //
-// 鎿嶄綔寤鸿锛?//   1) 渚濇鎸?A/B/X/Y/LB/RB锛岀‘璁ょ粓绔湅鍒扮殑鎸夐挳缂栧彿鏄?0/1/2/3/4/5銆?//   2) 鎸変笅宸?鍙虫憞鏉嗭紝纭鏄?9/10銆?//   3) 鎷ㄥ乏鎽囨潌锛岀‘璁よ酱 0/1 鍙樺寲锛涙嫧鍙虫憞鏉嗭紝纭杞?3 鍙樺寲銆?//   4) 鎸夊崄瀛楅敭锛岀‘璁よ酱 6/7 鍙樺寲锛堝乏鍙?6锛屼笂涓?7锛夈€?//   5) 娴嬬粍鍚堥敭锛歀B+X 搴旇鐪嬪埌 [LB_X -> Passive]锛?//      RB+DPadUp 搴旇鐪嬪埌 [RB_DPadUp -> RLLocomotion]銆?
+// 操作建议：
+//   1) 依次按 A/B/X/Y/LB/RB，确认终端看到的按钮编号是 0/1/2/3/4/5。
+//   2) 按下左/右摇杆，确认是 9/10。
+//   3) 拨左摇杆，确认轴 0/1 变化；拨右摇杆，确认轴 3 变化。
+//   4) 按十字键，确认轴 6/7 变化（左右=6，上下=7）。
+//   5) 测组合键：LB+X 应该看到 [LB_X -> Passive]；
+//      RB+DPadUp 应该看到 [RB_DPadUp -> RLLocomotion]。
+
 #include "joystick.hh"
 
 #include <cstdio>
@@ -46,7 +54,7 @@ const char* ButtonRoleByIndex(int idx) {
         case 5:  return "RB        (modifier)";
         case 9:  return "LStick    (press left stick)";
         case 10: return "RStick    (press right stick)";
-        default: return "(not mapped in rl_real_d1.cpp)";
+        default: return "(not mapped in rl_real_dmgo.cpp)";
     }
 }
 
@@ -57,7 +65,7 @@ const char* AxisRoleByIndex(int idx) {
         case 3: return "right stick X  -> control.yaw (sign inverted, *0.5)";
         case 6: return "DPad horizontal (>0 Left, <0 Right)";
         case 7: return "DPad vertical   (<0 Up,   >0 Down)";
-        default: return "(not used in rl_real_d1.cpp)";
+        default: return "(not used in rl_real_dmgo.cpp)";
     }
 }
 
@@ -107,7 +115,7 @@ int main(int argc, char** argv) {
     if (argc >= 2) device = argv[1];
 
     std::printf("=================================================================\n");
-    std::printf("  Joystick mapping tester (compares against rl_real_d1.cpp)\n");
+    std::printf("  Joystick mapping tester (compares against rl_real_dmgo.cpp)\n");
     std::printf("  Device: %s\n", device.c_str());
     std::printf("=================================================================\n\n");
 
@@ -194,4 +202,3 @@ int main(int argc, char** argv) {
     }
     return 0;
 }
-

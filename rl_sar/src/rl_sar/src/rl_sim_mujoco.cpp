@@ -890,7 +890,7 @@ void RL_Sim::ApplyDogUsbControl(bool emit_events)
 
     if (dog_control_valid)
     {
-        this->control.x = static_cast<float>(state.x);
+        this->control.x = state.x < -0.6f ? -0.6f : static_cast<float>(state.x);
         this->control.y = static_cast<float>(state.y);
         this->control.yaw = static_cast<float>(state.yaw);
     }
@@ -992,8 +992,8 @@ void RL_Sim::UpdateCsvAutoRecord(double t)
         {0.0, 6.0, "stand_init", 0.0f, 0.0f, 0.0f},
         {6.0, 16.0, "back_0p3", -0.3f, 0.0f, 0.0f},
         {16.0, 26.0, "back_0p5", -0.5f, 0.0f, 0.0f},
-        {26.0, 36.0, "back_0p7", -0.7f, 0.0f, 0.0f},
-        {36.0, 46.0, "back_0p9", -0.9f, 0.0f, 0.0f},
+        {26.0, 36.0, "back_0p6", -0.6f, 0.0f, 0.0f},
+        {36.0, 46.0, "back_0p6_repeat", -0.6f, 0.0f, 0.0f},
         {46.0, 52.0, "stand_end", 0.0f, 0.0f, 0.0f},
     };
 
@@ -1458,9 +1458,9 @@ void RL_Sim::GetSysJoystick()
 
     if (has_input)
     {
-        // 后退限到 -0.7: 后退 motion 只覆盖到 ~-0.77(0p70 档),训练 max_backward_curriculum=0.7。
+        // 后退限到 -0.6: 后退 motion 只覆盖到 ~-0.77(0p70 档),训练 max_backward_curriculum=0.6。
         // 摇杆后退满偏(ly=-1.0)会超出训练/motion 范围,策略外推导致下蹲、膝盖贴地。
-        this->control.x = (ly < -0.7f) ? -0.7f : ly;
+        this->control.x = (ly < -0.6f) ? -0.6f : ly;
         this->control.y = lx;
         this->control.yaw = rx;
         this->sys_js_active = true;
@@ -1485,8 +1485,8 @@ void RL_Sim::RunModel()
         this->obs.commands = {this->control.x, this->control.y, this->control.yaw};
         // 命令统一裁剪到 motion 覆盖范围: 键盘是累加式且无上限(rl_sdk.cpp 每按一次 ±0.1)、摇杆满偏也可能超范围,
         // 超出后 AMP policy 外推会退化(后退下蹲贴地、横移>1.2 变后退)。手柄/键盘/导航三条路径在此统一兜底。
-        // vx: 后退 motion 仅到 -0.77、前进到 1.23; vy: 纯横移 motion 仅到 ±0.50; wz: 转向 motion 到 ±1.02
-        this->obs.commands[0] = this->obs.commands[0] < -0.7f ? -0.7f : (this->obs.commands[0] > 1.2f ? 1.2f : this->obs.commands[0]);
+        // vx: 后退 motion 仅到 -0.77、前进到 1.0; vy: 纯横移 motion 仅到 ±0.50; wz: 转向 motion 到 ±1.02
+        this->obs.commands[0] = this->obs.commands[0] < -0.6f ? -0.6f : (this->obs.commands[0] > 1.0f ? 1.0f : this->obs.commands[0]);
         this->obs.commands[1] = this->obs.commands[1] < -0.6f ? -0.6f : (this->obs.commands[1] > 0.6f ? 0.6f : this->obs.commands[1]);
         this->obs.commands[2] = this->obs.commands[2] < -1.0f ? -1.0f : (this->obs.commands[2] > 1.0f ? 1.0f : this->obs.commands[2]);
         //not currently available for non-ros mujoco version

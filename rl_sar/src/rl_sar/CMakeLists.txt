@@ -205,10 +205,18 @@ if(EXISTS "${LIBTORCH_DIR}/include" AND EXISTS "${LIBTORCH_DIR}/lib")
         message(STATUS "Torch libraries: ${TORCH_LIBRARIES}")
     else()
         set(USE_TORCH "OFF")
-        message(WARNING "LibTorch found but find_package(Torch) failed")
+        if(USE_ONNX)
+            message(STATUS "LibTorch found but find_package(Torch) failed; skipping optional LibTorch backend")
+        else()
+            message(WARNING "LibTorch found but find_package(Torch) failed")
+        endif()
     endif()
 else()
-    message(WARNING "LibTorch not found. Please run: bash download_inference_runtime.sh libtorch")
+    if(USE_ONNX)
+        message(STATUS "LibTorch not found; skipping optional LibTorch backend")
+    else()
+        message(WARNING "LibTorch not found. Please run: bash download_inference_runtime.sh libtorch")
+    endif()
 endif()
 
 # RPATH Configuration for inference libraries
@@ -454,6 +462,25 @@ if(SYSTEM_TYPE STREQUAL "Linux" AND NOT USE_CMAKE)
     endif()
 endif()
 
+# executable for rl real d1 trigger service
+if(SYSTEM_TYPE STREQUAL "Linux" AND NOT USE_CMAKE)
+    add_executable(rl_real_d1_trigger
+        src/rl_real_d1_trigger.cpp
+        src/dog_usb_receiver.cpp
+    )
+
+    target_link_libraries(rl_real_d1_trigger
+        joystick
+        Threads::Threads
+    )
+    target_include_directories(rl_real_d1_trigger PRIVATE
+        library/thirdparty/joystick
+    )
+    if($ENV{ROS_DISTRO} MATCHES "foxy|humble")
+        install(TARGETS rl_real_d1_trigger DESTINATION lib/${PROJECT_NAME})
+    endif()
+endif()
+
 # executable for actuator net
 if(NOT USE_CMAKE)
     if($ENV{ROS_DISTRO} MATCHES "noetic")
@@ -472,7 +499,7 @@ endif()
 if(NOT USE_CMAKE)
     if($ENV{ROS_DISTRO} MATCHES "foxy|humble")
         install(
-            DIRECTORY launch worlds ${PROJECT_ROOT_DIR}/policy
+            DIRECTORY launch worlds systemd ${PROJECT_ROOT_DIR}/policy
             DESTINATION share/${PROJECT_NAME}/${dir}
         )
     endif()

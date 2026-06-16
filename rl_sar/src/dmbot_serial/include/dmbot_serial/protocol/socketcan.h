@@ -55,6 +55,9 @@ private:
   ifreq interface_request_{};
   sockaddr_can address_{};
   pthread_t receiver_thread_id_{};
+  std::string interface_name_;
+  int thread_priority_ = 0;
+  std::chrono::steady_clock::time_point last_reopen_attempt_{};
 
 public:
   /**
@@ -70,7 +73,9 @@ public:
   SocketCAN() = default;
   ~SocketCAN();
 
-  void log_throttled_error(const std::string& interface_name) const;
+  void log_throttled_error(const std::string& interface_name, const std::string& reason) const;
+  bool should_reopen_on_error(int error_code) const;
+  bool reopen_if_needed(int error_code);
   /** \brief Open and bind socket.
    *
    * \param interface bus's name(example: can0).
@@ -92,8 +97,8 @@ public:
    *
    * \param frame referenced frame which you want to send.
    */
-  void write(can_frame* frame) const;
-  void write2(canfd_frame* frame) const;
+  void write(can_frame* frame);
+  void write2(canfd_frame* frame);
   /** \brief Starts a new thread, that will wait for socket events.
    *
    */

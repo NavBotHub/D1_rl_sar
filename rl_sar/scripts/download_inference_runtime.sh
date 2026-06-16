@@ -22,6 +22,16 @@ source "${SCRIPT_DIR}/common.sh"
 OS_TYPE="$(uname -s)"
 ARCH_TYPE="$(uname -m)"
 
+# Detect NVIDIA Jetson before selecting runtime binaries. Generic ARM64 Linux
+# has no official LibTorch prebuilt archive, but Jetson can build LibTorch from
+# the installed NVIDIA PyTorch wheel.
+IS_JETSON=false
+if [ "${OS_TYPE}" = "Linux" ] && [ "${ARCH_TYPE}" = "aarch64" ]; then
+    if [ -f /etc/nv_tegra_release ] || ls /usr/local/cuda-*/targets/aarch64-linux >/dev/null 2>&1; then
+        IS_JETSON=true
+    fi
+fi
+
 # Parse arguments: support both new and old usage
 if [ $# -eq 0 ]; then
     TARGET_DIR="library/inference_runtime"
@@ -216,27 +226,37 @@ download_onnxruntime() {
     esac
 
     local archive_path="${MODEL_INTERFACE_DIR}/${archive_name}"
+    local bundled_archive="${PROJECT_ROOT}/third_party/onnxruntime/${archive_name}"
+    local archive_is_temp=true
 
-    print_info "Downloading ONNX Runtime ${ONNXRUNTIME_VERSION}..."
+    print_info "Preparing ONNX Runtime ${ONNXRUNTIME_VERSION}..."
     print_info "Platform: ${OS_TYPE} (${ARCH_TYPE})"
-    print_info "URL: ${url}"
 
-    # Download
-    if command -v curl &> /dev/null; then
-        curl -L --progress-bar -o "${archive_path}" "${url}" || {
-            print_error "Download failed"
-            rm -f "${archive_path}"
-            exit 1
-        }
-    elif command -v wget &> /dev/null; then
-        wget --show-progress -O "${archive_path}" "${url}" || {
-            print_error "Download failed"
-            rm -f "${archive_path}"
-            exit 1
-        }
+    if [ -f "${bundled_archive}" ]; then
+        archive_path="${bundled_archive}"
+        archive_is_temp=false
+        print_info "Using bundled archive: ${bundled_archive}"
     else
-        print_error "curl or wget is required to download files"
-        exit 1
+        print_info "Downloading ONNX Runtime ${ONNXRUNTIME_VERSION}..."
+        print_info "URL: ${url}"
+
+        # Download
+        if command -v curl &> /dev/null; then
+            curl -L --progress-bar -o "${archive_path}" "${url}" || {
+                print_error "Download failed"
+                rm -f "${archive_path}"
+                exit 1
+            }
+        elif command -v wget &> /dev/null; then
+            wget --show-progress -O "${archive_path}" "${url}" || {
+                print_error "Download failed"
+                rm -f "${archive_path}"
+                exit 1
+            }
+        else
+            print_error "curl or wget is required to download files"
+            exit 1
+        fi
     fi
 
     print_info "Extracting ONNX Runtime..."
@@ -248,13 +268,19 @@ download_onnxruntime() {
     if [[ "${archive_name}" == *.zip ]]; then
         unzip -o -q "${archive_path}" -d "${temp_dir}" || {
             print_error "Extraction failed"
-            rm -rf "${temp_dir}" "${archive_path}"
+            rm -rf "${temp_dir}"
+            if [ "${archive_is_temp}" = true ]; then
+                rm -f "${archive_path}"
+            fi
             exit 1
         }
     else
         tar -xzf "${archive_path}" -C "${temp_dir}" || {
             print_error "Extraction failed"
-            rm -rf "${temp_dir}" "${archive_path}"
+            rm -rf "${temp_dir}"
+            if [ "${archive_is_temp}" = true ]; then
+                rm -f "${archive_path}"
+            fi
             exit 1
         }
     fi
@@ -265,12 +291,18 @@ download_onnxruntime() {
         mv "${extracted_dir}" "${ONNXRUNTIME_DIR}"
     else
         print_error "Incorrect directory structure after extraction"
-        rm -rf "${temp_dir}" "${archive_path}"
+        rm -rf "${temp_dir}"
+        if [ "${archive_is_temp}" = true ]; then
+            rm -f "${archive_path}"
+        fi
         exit 1
     fi
 
     # Cleanup
-    rm -rf "${temp_dir}" "${archive_path}"
+    rm -rf "${temp_dir}"
+    if [ "${archive_is_temp}" = true ]; then
+        rm -f "${archive_path}"
+    fi
 
     print_success "ONNX Runtime ${ONNXRUNTIME_VERSION} installed successfully"
 }

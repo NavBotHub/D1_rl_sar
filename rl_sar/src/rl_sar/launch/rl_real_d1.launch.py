@@ -47,6 +47,26 @@ def generate_launch_description():
             default_value='false',
             description='Allow joystick/keyboard fallback after dog USB timeout'
         ),
+        DeclareLaunchArgument(
+            'dog_usb_l1_off_exit',
+            default_value='false',
+            description='Exit rl_real_d1 when DOG_CTRL L1 changes from ON to OFF'
+        ),
+        DeclareLaunchArgument(
+            'dog_usb_l1_button_bit',
+            default_value='8',
+            description='DOG_CTRL L1 bit in buttons field'
+        ),
+        DeclareLaunchArgument(
+            'keyboard_enable',
+            default_value='true',
+            description='Enable stdin keyboard control loop for rl_real_d1'
+        ),
+        DeclareLaunchArgument(
+            'sys_joystick_device',
+            default_value='/dev/input/js0',
+            description='Linux joystick device path for rl_real_d1'
+        ),
         
         # dm_imu 节点
         Node(
@@ -81,6 +101,10 @@ def generate_launch_description():
                 'dog_usb_timeout_ms': ParameterValue(LaunchConfiguration('dog_usb_timeout_ms'), value_type=int),
                 'dog_remote_timeout_ms': ParameterValue(LaunchConfiguration('dog_remote_timeout_ms'), value_type=int),
                 'dog_usb_allow_fallback': ParameterValue(LaunchConfiguration('dog_usb_allow_fallback'), value_type=bool),
+                'dog_usb_l1_off_exit': ParameterValue(LaunchConfiguration('dog_usb_l1_off_exit'), value_type=bool),
+                'dog_usb_l1_button_bit': ParameterValue(LaunchConfiguration('dog_usb_l1_button_bit'), value_type=int),
+                'keyboard_enable': ParameterValue(LaunchConfiguration('keyboard_enable'), value_type=bool),
+                'sys_joystick_device': LaunchConfiguration('sys_joystick_device'),
             }],
             prefix=['xterm -hold -e'],
             shell=True,

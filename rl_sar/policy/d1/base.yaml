@@ -14,16 +14,16 @@ d1:
              2.5, 2.5, 2.5]
   num_of_dofs: 12
   wheel_indices: []
-  torque_limits: [33.5, 33.5, 33.5,
-                  33.5, 33.5, 33.5,
-                  33.5, 33.5, 33.5,
-                  33.5, 33.5, 33.5]
+  torque_limits: [50.0, 50.0, 50.0,
+                  50.0, 50.0, 50.0,
+                  50.0, 50.0, 50.0,
+                  50.0, 50.0, 50.0]
   # 0.37m URDF-aligned stance: front/rear thigh offsets center feet under the hips,
   # calf relaxed from -0.8 to -0.75 to keep distance from the soft limit.
   default_dof_pos:   [ 0.00, -0.70, -0.75,
                       -0.00, -0.70, -0.75,
-                      0.00, -0.80, -0.75,
-                      -0.00, -0.80, -0.75]
+                      0.00, -0.70, -0.75,
+                      -0.00, -0.70, -0.75]
                       
   joint_names: ["FL_hip_joint", "FL_thigh_joint", "FL_calf_joint",
                 "FR_hip_joint", "FR_thigh_joint", "FR_calf_joint",

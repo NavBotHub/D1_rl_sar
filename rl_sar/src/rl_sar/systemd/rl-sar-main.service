@@ -1,0 +1,17 @@
+[Unit]
+Description=RL SAR D1 main ROS2 control launch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=navbot
+WorkingDirectory=/home/navbot/project/d1_rl_sar/rl_sar
+Environment=RCUTILS_LOGGING_BUFFERED_STREAM=1
+ExecStart=/bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/navbot/project/d1_rl_sar/rl_sar/install/setup.bash && exec ros2 launch rl_sar rl_real_d1_headless.launch.py dog_usb_enable:=true dog_usb_device:=/dev/ttyTHS1 dog_usb_baud:=115200 dog_usb_timeout_ms:=300 dog_remote_timeout_ms:=1500 dog_usb_allow_fallback:=false dog_usb_l1_off_exit:=true dog_usb_l1_button_bit:=8 dog_usb_l1_exit_timeout_ms:=8000 keyboard_enable:=false sys_joystick_device:=/dev/input/js0'
+KillSignal=SIGINT
+TimeoutStopSec=10
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
