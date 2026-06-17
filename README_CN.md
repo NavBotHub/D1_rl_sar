@@ -218,29 +218,53 @@ sudo reboot
 
 ### 3.4 修改设备树：适配达妙载板
 
-官方 Jetson Orin Nano 开发套件不需要执行本步骤。达妙载板是第三方载板，部分接口默认设备树没有使能，需要替换 DTB 文件来适配。这里涉及的接口包括一路串口和一路 USB3.0。
-
-本仓库提供的 DTB 文件位置：
+官方 Jetson Orin Nano 开发套件不需要执行本步骤。达妙第三方载板使用板载 LoRa DOG_CTRL 串口前，先安装仓库内 DTB。脚本固定使用：
 
 ```text
 docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
 ```
 
-先把该文件放到 Jetson 的 `~/Downloads/` 目录。可以通过终端软件上传，也可以在电脑上用 `scp`：
+安装命令：
 
 ```bash
-scp docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb <用户名>@<板子IP>:~/Downloads/
-```
-
-然后在 Jetson 的 SSH 终端中执行：
-
-```bash
-cd ~/Downloads
-sudo mv kernel_tegra234-p3768-0000+p3767-0003-nv.dtb /boot/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
+cd $HOME/project/d1_rl_sar
+sudo bash docs/dtb/install_dmgo_dtb.sh
 sudo reboot
 ```
 
-重启后，达妙载板的一路串口和一路 USB3.0 口完成设备树使能。
+脚本会把 DTB 复制到 `/boot/dtb/`，备份已有 DTB 和 `/boot/extlinux/extlinux.conf`，并给 `primary` 启动项显式加入指向该 DTB 的 `FDT` 行。不要只手动复制 DTB 到 `/boot/dtb/`；这条 Jetson 启动链只有在 extlinux 启动项显式配置 `FDT` 行时才会使用 `/boot/dtb/` 里的文件。
+
+重启后验证：
+
+```bash
+tr -d '\0' < /proc/device-tree/compatible; echo
+
+for s in 3100000 3110000 3140000; do
+  echo "===== serial@$s ====="
+  tr -d '\0' < /proc/device-tree/bus@0/serial@$s/status 2>/dev/null || echo "no status"
+  echo
+done
+```
+
+预期结果：
+
+```text
+compatible 包含 p3767-0003
+serial@3110000 = okay
+```
+
+LoRa DOG_CTRL 仍按 `/dev/ttyTHS1` 检查：
+
+```bash
+sudo stty -F /dev/ttyTHS1 115200 raw -echo
+sudo timeout 2s cat /dev/ttyTHS1 | xxd -g 1 -c 24 | head
+```
+
+正常 DOG_CTRL 帧头为：
+
+```text
+44 54 01 20
+```
 
 ## 4. 仓库部署与编译
 
@@ -408,11 +432,22 @@ ros2 topic echo /imu/data --once
 
 `DM-USB2CANFD_Dual` 出厂固件通常不是 Linux SocketCAN 模式。使用 SocketCAN 前，需要用达妙官方升级工具刷入 socketcan 固件。
 
+仓库内已放入本次验证使用的升级工具和固件：
+
+- 升级工具：[docs/usb2canfd/tools/USB2CANFD_UpdateTool.zip](docs/usb2canfd/tools/USB2CANFD_UpdateTool.zip)
+- SocketCAN 固件：[docs/usb2canfd/firmware/dm_usb2canfd_dual_gsusb_1004.enc](docs/usb2canfd/firmware/dm_usb2canfd_dual_gsusb_1004.enc)
+
+烧录界面参考：
+
+![USB-CANFD 固件烧录工具](docs/usb2canfd/images/canfd_update_tool.png)
+
 参考固件名：
 
 ```text
 dm_usb2canfd_dual_gsusb_1004.enc
 ```
+
+烧录时在 Windows 上解压升级工具，打开设备后选择上面的 `.enc` 固件，再点击固件升级。刷入完成后重新插拔 USB-CANFD。
 
 刷入前常见现象：
 
@@ -567,6 +602,12 @@ sudo cansend can1 123##91122334455667788
 
 零点标定前，需要先用达妙调试助手完成 12 个腿部 `DM6248P` 电机的基础配置。这一步很关键，必须确保每个电机参数一致。
 
+仓库内已放入实机电机设置使用的达妙调试助手：
+
+- 达妙调试助手：[docs/motor/tools/DMTool_v2.1.5.3.zip](docs/motor/tools/DMTool_v2.1.5.3.zip)
+
+在 Windows 上解压后运行 DMTool，连接 USB-CANFD，再进入参数设置页逐个配置电机。
+
 设置电机 ID：
 
 - 根据硬件接线图，给每个电机设置对应的 `CAN ID` 和 `Master ID`。
@@ -715,6 +756,14 @@ ros2 run rl_sar rl_real_d1
 
 `rl_real_d1` 的键盘输入需要 TTY。常用按键：
 
+单纯键盘控制启动：
+
+```bash
+ros2 launch rl_sar rl_real_d1.launch.py \
+  dog_usb_enable:=false \
+  keyboard_enable:=true
+```
+
 | 按键 | FSM 切换 |
 |---|---|
 | `0` | Passive / GetDown -> GetUp |
@@ -723,6 +772,15 @@ ros2 run rl_sar rl_real_d1
 | `P` | 任意状态 -> Passive |
 
 ### 7.3 手柄控制
+
+单纯 ROS2 手柄控制启动：
+
+```bash
+ros2 launch rl_sar rl_real_d1_headless.launch.py \
+  dog_usb_enable:=false \
+  keyboard_enable:=false \
+  sys_joystick_device:=/dev/input/js0
+```
 
 程序硬编码读取 Linux joystick 设备 `/dev/input/js0`。检查：
 
@@ -791,23 +849,19 @@ dog_usb_l1_exit_timeout_ms:=8000
 如需前台验证参数是否已经安装到当前工作区：
 
 ```bash
-cd /home/navbot/project/d1_rl_sar/rl_sar
+cd $HOME/project/d1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch rl_sar rl_real_d1_headless.launch.py --show-args | grep dog_usb_l1
 ```
 
-更新 service 模板后，需要先重新构建，让 `install/share/rl_sar/systemd/` 里的模板同步更新，再复制到 systemd：
+更新 service 模板后，需要先重新构建，让 `install/share/rl_sar/systemd/` 里的模板同步更新，再运行安装脚本。脚本会按当前工作区路径写入 `/etc/default/rl-sar`，因此不同用户名都可以使用同一套流程：
 
 ```bash
-cd /home/navbot/project/d1_rl_sar/rl_sar
+cd $HOME/project/d1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 ./build.sh rl_sar
-sudo cp install/share/rl_sar/systemd/rl-sar-*.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl reset-failed rl-sar-trigger.service
-sudo systemctl enable rl-sar-trigger.service
-sudo systemctl restart rl-sar-trigger.service
+sudo bash install/share/rl_sar/systemd/install_rl_sar_services.sh
 ```
 
 现场调试日志：
@@ -821,9 +875,10 @@ journalctl -u rl-sar-trigger.service -u rl-sar-main.service -f
 - `L1 ON` 后是否出现 `started rl-sar-main.service`。
 - `L1 OFF` 后是否出现 `L1 OFF edge detected`。
 - `rl_real_d1` 退出后 `rl-sar-main.service` 是否变成 inactive。
-- 如果日志出现 `status=200/CHDIR` 或 `Changing to the requested working directory failed`，说明 service 里的 `WorkingDirectory` 不存在；执行 `systemctl cat rl-sar-trigger.service | grep WorkingDirectory`，应看到 `/home/navbot/project/d1_rl_sar/rl_sar`。
+- 如果日志出现 `cd: ... No such file or directory`，说明 `/etc/default/rl-sar` 里的 `RL_SAR_ROOT` 不正确；执行 `cat /etc/default/rl-sar`，应看到当前工作区路径，例如 `$HOME/project/d1_rl_sar/rl_sar`。
+- 如果 ROS 节点报 `failed to configure logging: Failed to get logging directory`，重新安装 service 模板；模板会给 systemd 设置绝对路径的 `ROS_HOME` 和 `ROS_LOG_DIR`。
 - 如果 `L1 OFF` 没反应，优先确认 `dog_usb_l1_button_bit:=8`；如现场 BTN 位不一致，只改这个 bit。
-- 如果 `OFF` 后能退出电机控制但再次 `ON` 没反应，优先确认 `rl_real_d1_headless.launch.py` 已经包含 `OnProcessExit -> Shutdown`，并且 service 模板已经重新复制、`daemon-reload` 已执行。
+- 如果 `OFF` 后能退出电机控制但再次 `ON` 没反应，优先确认 `rl_real_d1_headless.launch.py` 已经包含 `OnProcessExit -> Shutdown`，并且已经重新运行 `install_rl_sar_services.sh`。
 
 ## 8. MuJoCo 可选仿真
 

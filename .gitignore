@@ -1,10 +1,10 @@
-﻿# --- OS / editor ---
+# --- OS / editor ---
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 
 .vscode/
 .idea/
-.marscode/
 *.swp
 *.swo
 *~
@@ -32,9 +32,7 @@ cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-# Do not ignore source Makefiles such as 5.15/Makefile.
-**/build/**/Makefile
-**/cmake_build/**/Makefile
+Makefile
 compile_commands.json
 *.cmake.user
 
@@ -77,13 +75,3 @@ rl_sar/*_probe.py
 # --- Third-party libraries (very large binaries) ---
 # Keep these out of git; download/install separately if needed.
 rl_sar/library/
-
-
-# --- Kernel module build outputs ---
-5.15/*.cmd
-5.15/*.o
-5.15/*.ko
-5.15/*.mod
-5.15/*.mod.c
-5.15/Module.symvers
-5.15/modules.order

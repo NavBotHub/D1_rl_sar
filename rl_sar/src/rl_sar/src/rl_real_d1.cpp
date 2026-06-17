@@ -10,6 +10,11 @@
     #include <std_msgs/msg/float64_multi_array.hpp>
 #endif
 
+namespace
+{
+constexpr float kBackwardCommandLimit = -0.4f;
+}
+
 // 构造实机 D1 控制器。
 //
 // 这里完成实机节点的主要初始化：创建 ROS 话题、读取 base.yaml、创建状态机、
@@ -415,9 +420,9 @@ void RL_Real::GetSysJoystick()
     bool has_input = (ly != 0.0f || lx != 0.0f || rx != 0.0f);
     if (has_input)
     {
-        // 后退限到 -0.6(对齐训练 max_backward_curriculum): 后退 motion 只覆盖到 ~-0.77,
+        // 后退限到 -0.4: 后退 motion 只覆盖到 ~-0.77,
         // 摇杆后退满偏会超出范围,策略外推导致下蹲、膝盖贴地。
-        this->control.x = (ly < -0.6f) ? -0.6f : ly;
+        this->control.x = (ly < kBackwardCommandLimit) ? kBackwardCommandLimit : ly;
         this->control.y = lx;
         this->control.yaw = rx*0.5;
         this->sys_js_active = true;
@@ -656,7 +661,7 @@ void RL_Real::ApplyDogUsbControl(bool emit_events)
 
     if (dog_control_valid)
     {
-        this->control.x = state.x < -0.6f ? -0.6f : static_cast<float>(state.x);
+        this->control.x = state.x < kBackwardCommandLimit ? kBackwardCommandLimit : static_cast<float>(state.x);
         this->control.y = static_cast<float>(state.y);
         this->control.yaw = static_cast<float>(state.yaw);
     }
@@ -784,7 +789,7 @@ void RL_Real::RunModel()
         // 命令统一裁剪到 motion 覆盖范围(键盘累加无上限/摇杆满偏都会超范围,
         // 超出后 AMP policy 外推退化: 后退下蹲、横移>1.2变后退)。
         // vx 后退motion到-0.77,前进到1.0; vy 纯横移motion仅到0.50; wz 转向motion到1.02
-        this->obs.commands[0] = this->obs.commands[0] < -0.6f ? -0.6f : (this->obs.commands[0] > 1.0f ? 1.0f : this->obs.commands[0]);
+        this->obs.commands[0] = this->obs.commands[0] < kBackwardCommandLimit ? kBackwardCommandLimit : (this->obs.commands[0] > 1.0f ? 1.0f : this->obs.commands[0]);
         this->obs.commands[1] = this->obs.commands[1] < -0.6f ? -0.6f : (this->obs.commands[1] > 0.6f ? 0.6f : this->obs.commands[1]);
         this->obs.commands[2] = this->obs.commands[2] < -1.0f ? -1.0f : (this->obs.commands[2] > 1.0f ? 1.0f : this->obs.commands[2]);
         this->obs.base_quat = this->robot_state.imu.quaternion;

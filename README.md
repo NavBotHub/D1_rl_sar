@@ -218,29 +218,53 @@ After reboot, WiFi should appear, and you can connect to Jetson Orin Nano throug
 
 ### 3.4 Device Tree for the DaMiao Carrier Board
 
-Skip this step for the official Jetson Orin Nano developer kit. The DaMiao carrier board is a third-party board; some designed interfaces are not enabled by the default device tree. Replace the DTB file to enable them. This step enables one UART and one USB3.0 port.
-
-The DTB file provided by this repository is:
+Skip this step for the official Jetson Orin Nano developer kit. For the DaMiao third-party carrier board, install the repository DTB before using the onboard LoRa DOG_CTRL serial path. The installer always uses:
 
 ```text
 docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
 ```
 
-First put this file into Jetson's `~/Downloads/` directory. You can upload it with your terminal tool, or use `scp` from your computer:
+Install it with:
 
 ```bash
-scp docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb <username>@<board-ip>:~/Downloads/
-```
-
-Then run this on Jetson through SSH:
-
-```bash
-cd ~/Downloads
-sudo mv kernel_tegra234-p3768-0000+p3767-0003-nv.dtb /boot/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
+cd $HOME/project/d1_rl_sar
+sudo bash docs/dtb/install_dmgo_dtb.sh
 sudo reboot
 ```
 
-After reboot, the DaMiao carrier board's UART and USB3.0 port are enabled by the updated device tree.
+The script copies the DTB into `/boot/dtb/`, backs up the existing DTB and `/boot/extlinux/extlinux.conf`, and makes the `primary` extlinux entry explicitly boot that DTB through an `FDT` line. Do not install it by manually copying the DTB only; on this Jetson boot chain, `/boot/dtb/` is used only when the extlinux entry has an explicit `FDT` line.
+
+After reboot, verify:
+
+```bash
+tr -d '\0' < /proc/device-tree/compatible; echo
+
+for s in 3100000 3110000 3140000; do
+  echo "===== serial@$s ====="
+  tr -d '\0' < /proc/device-tree/bus@0/serial@$s/status 2>/dev/null || echo "no status"
+  echo
+done
+```
+
+Expected result:
+
+```text
+compatible contains p3767-0003
+serial@3110000 = okay
+```
+
+LoRa DOG_CTRL should still be checked on `/dev/ttyTHS1`:
+
+```bash
+sudo stty -F /dev/ttyTHS1 115200 raw -echo
+sudo timeout 2s cat /dev/ttyTHS1 | xxd -g 1 -c 24 | head
+```
+
+Normal DOG_CTRL frames start with:
+
+```text
+44 54 01 20
+```
 
 ## 4. Repository Setup and Build
 
@@ -408,11 +432,22 @@ Seeing a `sensor_msgs/msg/Imu` message means the IMU path works.
 
 `DM-USB2CANFD_Dual` usually does not ship in Linux SocketCAN mode. Before using SocketCAN, flash the socketcan firmware with DaMiao's official upgrade tool.
 
+The verified upgrade tool and firmware are stored in this repository:
+
+- Upgrade tool: [docs/usb2canfd/tools/USB2CANFD_UpdateTool.zip](docs/usb2canfd/tools/USB2CANFD_UpdateTool.zip)
+- SocketCAN firmware: [docs/usb2canfd/firmware/dm_usb2canfd_dual_gsusb_1004.enc](docs/usb2canfd/firmware/dm_usb2canfd_dual_gsusb_1004.enc)
+
+Firmware flashing UI reference:
+
+![USB-CANFD firmware update tool](docs/usb2canfd/images/canfd_update_tool.png)
+
 Reference firmware name:
 
 ```text
 dm_usb2canfd_dual_gsusb_1004.enc
 ```
+
+On Windows, unzip the upgrade tool, open the USB-CANFD device, select the `.enc` firmware above, then click firmware upgrade. Re-plug USB-CANFD after flashing.
 
 Before flashing:
 
@@ -566,6 +601,12 @@ No manual `can0/can1` to `can1/can2` source edit is needed.
 ### 6.1 Real Motor Setup
 
 Before zero calibration, use the DaMiao debug assistant to configure all 12 leg `DM6248P` motors. This step is critical; make sure every motor uses the same parameter set.
+
+The DaMiao debug assistant used for real motor setup is stored in this repository:
+
+- DaMiao debug assistant: [docs/motor/tools/DMTool_v2.1.5.3.zip](docs/motor/tools/DMTool_v2.1.5.3.zip)
+
+On Windows, unzip and run DMTool, connect USB-CANFD, then configure each motor from the parameter page.
 
 Set motor ID:
 
@@ -791,23 +832,19 @@ dog_usb_l1_exit_timeout_ms:=8000
 To verify that the parameters are installed in the current workspace:
 
 ```bash
-cd /home/navbot/project/d1_rl_sar/rl_sar
+cd $HOME/project/d1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch rl_sar rl_real_d1_headless.launch.py --show-args | grep dog_usb_l1
 ```
 
-After updating service templates, rebuild first so the templates under `install/share/rl_sar/systemd/` are refreshed, then copy them to systemd:
+After updating service templates, rebuild first so the templates under `install/share/rl_sar/systemd/` are refreshed, then run the installer. The installer writes the current workspace path to `/etc/default/rl-sar`, so any deployment user can use the same flow:
 
 ```bash
-cd /home/navbot/project/d1_rl_sar/rl_sar
+cd $HOME/project/d1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 ./build.sh rl_sar
-sudo cp install/share/rl_sar/systemd/rl-sar-*.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl reset-failed rl-sar-trigger.service
-sudo systemctl enable rl-sar-trigger.service
-sudo systemctl restart rl-sar-trigger.service
+sudo bash install/share/rl_sar/systemd/install_rl_sar_services.sh
 ```
 
 Field debug logs:
@@ -821,9 +858,10 @@ Watch for:
 - Whether `started rl-sar-main.service` appears after `L1 ON`.
 - Whether `L1 OFF edge detected` appears after `L1 OFF`.
 - Whether `rl-sar-main.service` becomes inactive after `rl_real_d1` exits.
-- If logs show `status=200/CHDIR` or `Changing to the requested working directory failed`, the service `WorkingDirectory` does not exist. Run `systemctl cat rl-sar-trigger.service | grep WorkingDirectory`; it should show `/home/navbot/project/d1_rl_sar/rl_sar`.
+- If logs show `cd: ... No such file or directory`, `RL_SAR_ROOT` in `/etc/default/rl-sar` is wrong. Run `cat /etc/default/rl-sar`; it should show the current workspace path, for example `$HOME/project/d1_rl_sar/rl_sar`.
+- If ROS nodes fail with `failed to configure logging: Failed to get logging directory`, reinstall the service templates. The templates set absolute `ROS_HOME` and `ROS_LOG_DIR` paths for systemd.
 - If `L1 OFF` does not work, first confirm `dog_usb_l1_button_bit:=8`. If the field BTN bit differs, change only this bit.
-- If `OFF` exits motor control but the next `ON` does not respond, first confirm `rl_real_d1_headless.launch.py` includes `OnProcessExit -> Shutdown`, and that the service templates have been copied again with `daemon-reload` executed.
+- If `OFF` exits motor control but the next `ON` does not respond, first confirm `rl_real_d1_headless.launch.py` includes `OnProcessExit -> Shutdown`, and that `install_rl_sar_services.sh` has been rerun.
 
 ## 8. Optional MuJoCo Simulation
 
