@@ -65,7 +65,7 @@ rl_sar/**/cmake_build/
 *.bak_*
 *.orig
 *.core
-core
+/core
 
 # --- Large/generated simulation data ---
 *.csv
