@@ -436,8 +436,8 @@ void RL_Sim::JoyCallback(
     if (this->joy_msg.buttons[5] && this->joy_msg.axes[6] > 0) this->control.SetGamepad(Input::Gamepad::RB_DPadLeft);
     if (this->joy_msg.buttons[4] && this->joy_msg.buttons[5]) this->control.SetGamepad(Input::Gamepad::LB_RB);
 
-    // 后退限到 -0.7(对齐训练 max_backward_curriculum,避免摇杆后退满偏外推下蹲)
-    this->control.x = (this->joy_msg.axes[1] < -0.7f) ? -0.7f : this->joy_msg.axes[1]; // LY
+    // 后退限到 -0.6(对齐训练 max_backward_curriculum,避免摇杆后退满偏外推下蹲)
+    this->control.x = (this->joy_msg.axes[1] < -0.6f) ? -0.6f : this->joy_msg.axes[1]; // LY
     this->control.y = this->joy_msg.axes[0]; // LX
     this->control.yaw = this->joy_msg.axes[3]; // RX
     // std::cerr<<"x: "<<this->control.x<<"y: "<<this->control.y<<std::endl;
@@ -470,8 +470,8 @@ void RL_Sim::RunModel()
         }
         // 命令统一裁剪到 motion 覆盖范围: 键盘是累加式且无上限(rl_sdk.cpp 每按一次 ±0.1)、摇杆满偏也可能超范围,
         // 超出后 AMP policy 外推会退化(后退下蹲贴地、横移>1.2 变后退)。手柄/键盘/导航三条路径在此统一兜底。
-        // vx: 后退 motion 仅到 -0.77、前进到 1.23; vy: 纯横移 motion 仅到 ±0.50; wz: 转向 motion 到 ±1.02
-        this->obs.commands[0] = this->obs.commands[0] < -0.7f ? -0.7f : (this->obs.commands[0] > 1.2f ? 1.2f : this->obs.commands[0]);
+        // vx: 后退 motion 仅到 -0.77、前进到 1.0; vy: 纯横移 motion 仅到 ±0.50; wz: 转向 motion 到 ±1.02
+        this->obs.commands[0] = this->obs.commands[0] < -0.6f ? -0.6f : (this->obs.commands[0] > 1.0f ? 1.0f : this->obs.commands[0]);
         this->obs.commands[1] = this->obs.commands[1] < -0.6f ? -0.6f : (this->obs.commands[1] > 0.6f ? 0.6f : this->obs.commands[1]);
         this->obs.commands[2] = this->obs.commands[2] < -1.0f ? -1.0f : (this->obs.commands[2] > 1.0f ? 1.0f : this->obs.commands[2]);
         this->obs.base_quat = this->robot_state.imu.quaternion;

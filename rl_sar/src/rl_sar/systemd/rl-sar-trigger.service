@@ -1,0 +1,19 @@
+[Unit]
+Description=RL SAR D1 joystick and LoRa start trigger
+After=multi-user.target
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+Environment=ROS_HOME=/var/lib/rl-sar/ros
+Environment=ROS_LOG_DIR=/var/log/rl-sar/ros
+Environment=RCUTILS_LOGGING_BUFFERED_STREAM=1
+EnvironmentFile=/etc/default/rl-sar
+ExecStartPre=/bin/mkdir -p /var/lib/rl-sar/ros /var/log/rl-sar/ros
+ExecStart=/bin/bash -lc 'cd "${RL_SAR_ROOT}" && source /opt/ros/humble/setup.bash && source "${RL_SAR_ROOT}/install/setup.bash" && exec ros2 run rl_sar rl_real_d1_trigger --joy-device /dev/input/js0 --joy-button 3 --dog-usb-device /dev/ttyTHS1 --dog-usb-baud 115200 --dog-usb-l1-button-bit 8 --main-service rl-sar-main.service'
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

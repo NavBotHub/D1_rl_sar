@@ -76,6 +76,8 @@ private:
     bool DogUsbShouldBlockFallback() const;
     void TriggerDogUsbGamepad(Input::Gamepad gamepad, const char *name);
     void LogDogUsbStatus(bool safe_state, bool usb_timeout, bool remote_timeout, bool serial_connected);
+    std::vector<float> SmoothCommands(const std::vector<float>& target_commands, float dt);
+    void ResetCommandSmoothing() override;
     void UpdateCsvAutoRecord(double t);
     void LoadReplayQdes();
     void ApplyReplayQdes(double t);
@@ -133,6 +135,9 @@ private:
     bool dog_usb_last_usb_timeout = false;
     bool dog_usb_last_remote_timeout = false;
     bool dog_usb_last_serial_connected = true;
+    std::vector<float> smoothed_commands_{0.0f, 0.0f, 0.0f};
+    bool command_smoothing_initialized_ = false;
+    bool command_smoothing_reset_requested_ = true;
 
     // others
     std::string gazebo_model_name;

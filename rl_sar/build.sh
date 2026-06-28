@@ -22,8 +22,10 @@ setup_inference_runtime() {
     DOWNLOAD_SCRIPT="${SCRIPT_DIR}/scripts/download_inference_runtime.sh"
 
     if [ -f "$DOWNLOAD_SCRIPT" ]; then
+        local runtime_target="${INFERENCE_RUNTIME_TARGET:-$(detect_inference_runtime_target)}"
         print_info "Checking inference libraries..."
-        bash "$DOWNLOAD_SCRIPT" || {
+        print_info "Inference runtime target: ${runtime_target}"
+        bash "$DOWNLOAD_SCRIPT" "$runtime_target" || {
             print_error "Failed to setup inference libraries"
             exit 1
         }
@@ -31,6 +33,23 @@ setup_inference_runtime() {
     else
         print_warning "Download script not found: $DOWNLOAD_SCRIPT"
     fi
+}
+
+detect_inference_runtime_target() {
+    local config_file="${SCRIPT_DIR}/policy/d1/robot_lab/config.yaml"
+    local model_name=""
+
+    if [ -f "$config_file" ]; then
+        model_name=$(grep -E '^[[:space:]]*model_name:' "$config_file" | head -1 \
+            | sed -E 's/.*model_name:[[:space:]]*"?([^"#]+)"?.*/\1/' \
+            | tr -d ' ')
+    fi
+
+    case "${model_name,,}" in
+        *.onnx) echo "onnx" ;;
+        *.pt|*.pth) echo "libtorch" ;;
+        *) echo "all" ;;
+    esac
 }
 
 setup_mujoco() {

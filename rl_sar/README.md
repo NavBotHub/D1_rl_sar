@@ -74,10 +74,22 @@ Install the required packages:
 
 ```bash
 # Ubuntu
-sudo apt install cmake g++ build-essential libyaml-cpp-dev libeigen3-dev libboost-all-dev libspdlog-dev libfmt-dev libtbb-dev liblcm-dev
+sudo apt install -y cmake g++ build-essential libyaml-cpp-dev libeigen3-dev libboost-dev libboost-all-dev libspdlog-dev libfmt-dev libtbb-dev liblcm-dev libglfw3-dev libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
 
 # macOS
 brew install boost lcm yaml-cpp tbb libomp pkg-config glfw
+```
+
+`libtbb-dev` provides the TBB CMake package files required by the MuJoCo / CMake build. If `./build.sh -mj` reports missing `TBBConfig.cmake` or `tbb-config.cmake`, install it directly:
+
+```bash
+sudo apt install -y libtbb-dev
+```
+
+`libglfw3-dev` provides the GLFW CMake package files required by the MuJoCo visualization build. If `./build.sh -mj` reports missing `glfw3Config.cmake` or `glfw3-config.cmake`, install the OpenGL / X11 development packages:
+
+```bash
+sudo apt install -y libglfw3-dev libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
 ```
 
 If you need to use ROS, install the following dependency packages:

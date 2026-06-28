@@ -4,6 +4,7 @@
  */
 
 #include "rl_sim_mujoco.hpp"
+#include "command_shaping.hpp"
 
 #include <algorithm>
 #include <array>
@@ -849,6 +850,18 @@ void RL_Sim::LogDogUsbStatus(bool safe_state, bool usb_timeout, bool remote_time
     this->dog_usb_last_serial_connected = serial_connected;
 }
 
+void RL_Sim::ResetCommandSmoothing()
+{
+    this->command_smoothing_reset_requested_ = true;
+}
+
+std::vector<float> RL_Sim::SmoothCommands(const std::vector<float>& target_commands, float dt)
+{
+    return rl_command::SmoothCommands(
+        target_commands, dt, this->smoothed_commands_,
+        this->command_smoothing_initialized_, this->command_smoothing_reset_requested_);
+}
+
 void RL_Sim::ApplyDogUsbControl(bool emit_events)
 {
     if (!this->dog_usb_enable || !this->dog_usb_receiver)
@@ -890,15 +903,17 @@ void RL_Sim::ApplyDogUsbControl(bool emit_events)
 
     if (dog_control_valid)
     {
-        this->control.x = static_cast<float>(state.x);
-        this->control.y = static_cast<float>(state.y);
-        this->control.yaw = static_cast<float>(state.yaw);
+        const rl_command::PlanarCommand planar = rl_command::ShapePlanarCommand(static_cast<float>(state.x), static_cast<float>(state.y));
+        this->control.x = planar.x;
+        this->control.y = planar.y;
+        this->control.yaw = rl_command::ShapeYawCommand(static_cast<float>(state.yaw));
     }
     else if (channel_owns || dog_safe || remote_timeout || !serial_connected)
     {
         this->control.x = 0.0f;
         this->control.y = 0.0f;
         this->control.yaw = 0.0f;
+        this->ResetCommandSmoothing();
     }
 
     if (!emit_events || !usb_fresh)
@@ -992,8 +1007,8 @@ void RL_Sim::UpdateCsvAutoRecord(double t)
         {0.0, 6.0, "stand_init", 0.0f, 0.0f, 0.0f},
         {6.0, 16.0, "back_0p3", -0.3f, 0.0f, 0.0f},
         {16.0, 26.0, "back_0p5", -0.5f, 0.0f, 0.0f},
-        {26.0, 36.0, "back_0p7", -0.7f, 0.0f, 0.0f},
-        {36.0, 46.0, "back_0p9", -0.9f, 0.0f, 0.0f},
+        {26.0, 36.0, "back_0p6", -0.6f, 0.0f, 0.0f},
+        {36.0, 46.0, "back_0p6_repeat", -0.6f, 0.0f, 0.0f},
         {46.0, 52.0, "stand_end", 0.0f, 0.0f, 0.0f},
     };
 
@@ -1057,7 +1072,7 @@ void RL_Sim::RobotControl()
     {
         if (!this->csv_header_written)
         {
-            this->csv_ofs << "t,segment,command_x,command_y,command_yaw";
+            this->csv_ofs << "t,segment,raw_control_x,raw_control_y,raw_control_yaw,policy_cmd_x,policy_cmd_y,policy_cmd_yaw";
             for (int i = 0; i < 12; ++i)
             {
                 this->csv_ofs << ",q" << i << ",arm_q" << i;
@@ -1221,7 +1236,12 @@ void RL_Sim::RobotControl()
         const float base_ang_vel_y = this->robot_state.imu.gyroscope.size() > 1 ? this->robot_state.imu.gyroscope[1] : 0.f;
         const float base_ang_vel_z = this->robot_state.imu.gyroscope.size() > 2 ? this->robot_state.imu.gyroscope[2] : 0.f;
 
-        this->csv_ofs << t << "," << this->csv_segment_name << "," << this->control.x << "," << this->control.y << "," << this->control.yaw;
+        const float policy_cmd_x = this->obs.commands.size() > 0 ? this->obs.commands[0] : 0.f;
+        const float policy_cmd_y = this->obs.commands.size() > 1 ? this->obs.commands[1] : 0.f;
+        const float policy_cmd_yaw = this->obs.commands.size() > 2 ? this->obs.commands[2] : 0.f;
+        this->csv_ofs << t << "," << this->csv_segment_name
+                      << "," << this->control.x << "," << this->control.y << "," << this->control.yaw
+                      << "," << policy_cmd_x << "," << policy_cmd_y << "," << policy_cmd_yaw;
         const auto joint_mapping = this->params.Get<std::vector<int>>("joint_mapping");
         const int dof_count = std::min(12, this->params.Get<int>("num_of_dofs"));
         for (int i = 0; i < 12; ++i)
@@ -1458,11 +1478,12 @@ void RL_Sim::GetSysJoystick()
 
     if (has_input)
     {
-        // 后退限到 -0.7: 后退 motion 只覆盖到 ~-0.77(0p70 档),训练 max_backward_curriculum=0.7。
+        // 后退限到 -0.6: 后退 motion 只覆盖到 ~-0.77(0p70 档),训练 max_backward_curriculum=0.6。
         // 摇杆后退满偏(ly=-1.0)会超出训练/motion 范围,策略外推导致下蹲、膝盖贴地。
-        this->control.x = (ly < -0.7f) ? -0.7f : ly;
-        this->control.y = lx;
-        this->control.yaw = rx;
+        const rl_command::PlanarCommand planar = rl_command::ShapePlanarCommand(ly, lx);
+        this->control.x = planar.x;
+        this->control.y = planar.y;
+        this->control.yaw = rl_command::ShapeYawCommand(rx);
         this->sys_js_active = true;
     }
     else if (this->sys_js_active)
@@ -1482,13 +1503,12 @@ void RL_Sim::RunModel()
         this->episode_length_buf += 1;
         this->obs.ang_vel = this->robot_state.imu.gyroscope;
         this->ApplyDogUsbControl(false);
-        this->obs.commands = {this->control.x, this->control.y, this->control.yaw};
-        // 命令统一裁剪到 motion 覆盖范围: 键盘是累加式且无上限(rl_sdk.cpp 每按一次 ±0.1)、摇杆满偏也可能超范围,
-        // 超出后 AMP policy 外推会退化(后退下蹲贴地、横移>1.2 变后退)。手柄/键盘/导航三条路径在此统一兜底。
-        // vx: 后退 motion 仅到 -0.77、前进到 1.23; vy: 纯横移 motion 仅到 ±0.50; wz: 转向 motion 到 ±1.02
-        this->obs.commands[0] = this->obs.commands[0] < -0.7f ? -0.7f : (this->obs.commands[0] > 1.2f ? 1.2f : this->obs.commands[0]);
-        this->obs.commands[1] = this->obs.commands[1] < -0.6f ? -0.6f : (this->obs.commands[1] > 0.6f ? 0.6f : this->obs.commands[1]);
-        this->obs.commands[2] = this->obs.commands[2] < -1.0f ? -1.0f : (this->obs.commands[2] > 1.0f ? 1.0f : this->obs.commands[2]);
+        std::vector<float> target_commands = {this->control.x, this->control.y, this->control.yaw};
+        target_commands = rl_command::ClampCommands(target_commands);
+        const float command_dt = std::max(
+            this->params.Get<float>("dt") * static_cast<float>(this->params.Get<int>("decimation")),
+            1.0e-4f);
+        this->obs.commands = this->SmoothCommands(target_commands, command_dt);
         //not currently available for non-ros mujoco version
         // if (this->control.navigation_mode)
         // {

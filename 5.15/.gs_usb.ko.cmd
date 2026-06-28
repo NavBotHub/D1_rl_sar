@@ -1,0 +1,1 @@
+cmd_/home/navbot/project/dmgo_rl_sar/5.15/gs_usb.ko := ld -r -EL  -maarch64elf -z noexecstack --build-id=sha1  -T scripts/module.lds -o /home/navbot/project/dmgo_rl_sar/5.15/gs_usb.ko /home/navbot/project/dmgo_rl_sar/5.15/gs_usb.o /home/navbot/project/dmgo_rl_sar/5.15/gs_usb.mod.o;  true

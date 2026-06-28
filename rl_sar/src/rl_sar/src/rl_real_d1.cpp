@@ -3,6 +3,10 @@
 * SPDX-License-Identifier: Apache-2.0
 */
 #include "rl_real_d1.hpp"
+#include "command_shaping.hpp"
+
+#include <algorithm>
+#include <cmath>
 
 #if defined(USE_ROS1)
     #include "std_msgs/Float64MultiArray.h"
@@ -44,8 +48,15 @@ RL_Real::RL_Real(int argc, char **argv)
     dog_usb_timeout_ms = ros2_node->declare_parameter<int>("dog_usb_timeout_ms", 300);
     dog_remote_timeout_ms = ros2_node->declare_parameter<int>("dog_remote_timeout_ms", 1500);
     dog_usb_allow_fallback = ros2_node->declare_parameter<bool>("dog_usb_allow_fallback", false);
+    dog_usb_l1_off_exit = ros2_node->declare_parameter<bool>("dog_usb_l1_off_exit", false);
+    dog_usb_l1_button_bit = ros2_node->declare_parameter<int>("dog_usb_l1_button_bit", 8);
+    dog_usb_l1_exit_timeout_ms = ros2_node->declare_parameter<int>("dog_usb_l1_exit_timeout_ms", 8000);
+    keyboard_enable = ros2_node->declare_parameter<bool>("keyboard_enable", true);
+    sys_joystick_device = ros2_node->declare_parameter<std::string>("sys_joystick_device", "/dev/input/js0");
     if (dog_usb_timeout_ms < 1) {dog_usb_timeout_ms = 300;}
     if (dog_remote_timeout_ms < 1) {dog_remote_timeout_ms = 1500;}
+    if (dog_usb_l1_button_bit < 0 || dog_usb_l1_button_bit > 15) {dog_usb_l1_button_bit = 8;}
+    if (dog_usb_l1_exit_timeout_ms < 1) {dog_usb_l1_exit_timeout_ms = 8000;}
     if (this->dog_usb_enable)
     {
         if (this->dog_usb_device.empty())
@@ -68,7 +79,7 @@ RL_Real::RL_Real(int argc, char **argv)
 #endif
     // Linux 手柄设备会产生按键和摇杆事件。GetSysJoystick() 会把原始事件
     // 转换成统一的 Input::Gamepad 控制输入，供 FSM 和策略控制使用。
-    this->SetupSysJoystick("/dev/input/js0", 16); //  ls -l /dev/input/js*
+    this->SetupSysJoystick(this->sys_joystick_device, 16); //  ls -l /dev/input/js*
 
     // 创建状态机和控制循环之前，先读取 D1 基础配置。base.yaml 提供控制
     // 周期、固定增益、自由度数量、关节名称、默认关节位置等通用参数。
@@ -136,12 +147,19 @@ RL_Real::RL_Real(int argc, char **argv)
 
     // 启动周期线程。loop_control 是真正的电机闭环控制线程；base.yaml 中
     // dt=0.005 时，RobotControl() 以 200 Hz 运行。
-    this->loop_keyboard = std::make_shared<LoopFunc>("loop_keyboard", 0.05, std::bind(&RL_Real::KeyboardInterface, this));
     this->loop_control = std::make_shared<LoopFunc>("loop_control", this->params.Get<float>("dt"), std::bind(&RL_Real::RobotControl, this));
     // loop_rl 只在 rl_init_done 为 true 时产生策略输出；是否置位由 FSM
     // 中的具体状态决定。
     this->loop_rl = std::make_shared<LoopFunc>("loop_rl", this->params.Get<float>("dt") * this->params.Get<int>("decimation"), std::bind(&RL_Real::RunModel, this));
-    this->loop_keyboard->start();
+    if (this->keyboard_enable)
+    {
+        this->loop_keyboard = std::make_shared<LoopFunc>("loop_keyboard", 0.05, std::bind(&RL_Real::KeyboardInterface, this));
+        this->loop_keyboard->start();
+    }
+    else
+    {
+        std::cout << LOGGER::INFO << "Keyboard input disabled by parameter keyboard_enable=false" << std::endl;
+    }
     this->loop_control->start();
     this->loop_rl->start();
 
@@ -164,10 +182,10 @@ RL_Real::RL_Real(int argc, char **argv)
 
 RL_Real::~RL_Real()
 {
-    this->loop_keyboard->shutdown();
-    this->loop_control->shutdown();
-    this->loop_rl->shutdown();
-    this->loop_joystick->shutdown();
+    if (this->loop_keyboard) {this->loop_keyboard->shutdown();}
+    if (this->loop_control) {this->loop_control->shutdown();}
+    if (this->loop_rl) {this->loop_rl->shutdown();}
+    if (this->loop_joystick) {this->loop_joystick->shutdown();}
     if (this->dog_usb_receiver)
     {
         this->dog_usb_receiver->Stop();
@@ -401,11 +419,11 @@ void RL_Real::GetSysJoystick()
     bool has_input = (ly != 0.0f || lx != 0.0f || rx != 0.0f);
     if (has_input)
     {
-        // 后退限到 -0.7(对齐训练 max_backward_curriculum): 后退 motion 只覆盖到 ~-0.77,
-        // 摇杆后退满偏会超出范围,策略外推导致下蹲、膝盖贴地。
-        this->control.x = (ly < -0.7f) ? -0.7f : ly;
-        this->control.y = lx;
-        this->control.yaw = rx*0.5;
+        // Shape joystick axes into the deploy command envelope before use.
+        const rl_command::PlanarCommand planar = rl_command::ShapePlanarCommand(ly, lx);
+        this->control.x = planar.x;
+        this->control.y = planar.y;
+        this->control.yaw = rl_command::ShapeYawCommand(rx);
         this->sys_js_active = true;
     }
     else if (this->sys_js_active)
@@ -455,6 +473,117 @@ void RL_Real::TriggerDogUsbGamepad(Input::Gamepad gamepad, const char* name)
     std::cout << LOGGER::INFO << "[dog_usb] event " << name << std::endl;
 }
 
+void RL_Real::RequestDogUsbExit(const char* reason)
+{
+    if (this->dog_usb_exit_requested)
+    {
+        return;
+    }
+
+    this->dog_usb_exit_requested = true;
+    this->dog_usb_exit_shutdown_after_command = false;
+    this->dog_usb_exit_started_at = std::chrono::steady_clock::now();
+    this->control.x = 0.0f;
+    this->control.y = 0.0f;
+    this->control.yaw = 0.0f;
+    this->ResetCommandSmoothing();
+
+    std::cout << LOGGER::WARNING << "[dog_usb] " << reason
+              << "; requesting getdown then rl_real_d1 shutdown" << std::endl;
+}
+
+std::string RL_Real::CurrentFsmStateName() const
+{
+    if (!this->fsm.current_state_)
+    {
+        return "";
+    }
+    return this->fsm.current_state_->GetStateName();
+}
+
+bool RL_Real::DogUsbExitTimedOut() const
+{
+    if (!this->dog_usb_exit_requested)
+    {
+        return false;
+    }
+
+    const auto elapsed = std::chrono::steady_clock::now() - this->dog_usb_exit_started_at;
+    return elapsed >= std::chrono::milliseconds(this->dog_usb_l1_exit_timeout_ms);
+}
+
+void RL_Real::HoldDogUsbExitInputs()
+{
+    if (!this->dog_usb_exit_requested)
+    {
+        return;
+    }
+
+    this->control.x = 0.0f;
+    this->control.y = 0.0f;
+    this->control.yaw = 0.0f;
+    this->control.current_keyboard = Input::Keyboard::None;
+    this->control.last_keyboard = Input::Keyboard::None;
+    this->control.current_gamepad = Input::Gamepad::None;
+    this->ResetCommandSmoothing();
+
+    const std::string state_name = this->CurrentFsmStateName();
+    if (state_name == "RLFSMStateGetUp" || state_name == "RLFSMStateRLLocomotion")
+    {
+        this->control.SetGamepad(Input::Gamepad::B);
+    }
+}
+
+void RL_Real::UpdateDogUsbExitShutdown()
+{
+    if (!this->dog_usb_exit_requested)
+    {
+        return;
+    }
+
+    this->control.x = 0.0f;
+    this->control.y = 0.0f;
+    this->control.yaw = 0.0f;
+    this->ResetCommandSmoothing();
+
+    const std::string state_name = this->CurrentFsmStateName();
+    if (state_name == "RLFSMStatePassive")
+    {
+        this->dog_usb_exit_shutdown_after_command = true;
+        std::cout << LOGGER::INFO
+                  << "[dog_usb] L1 OFF exit reached passive; shutting down after this command"
+                  << std::endl;
+        return;
+    }
+
+    if (this->DogUsbExitTimedOut())
+    {
+        this->dog_usb_exit_shutdown_after_command = true;
+        std::cout << LOGGER::WARNING
+                  << "[dog_usb] L1 OFF exit timeout in state " << state_name
+                  << "; forcing rl_real_d1 shutdown" << std::endl;
+    }
+}
+
+void RL_Real::ShutdownDogUsbExitIfReady()
+{
+    if (!this->dog_usb_exit_shutdown_after_command)
+    {
+        return;
+    }
+
+    this->dog_usb_exit_shutdown_after_command = false;
+
+#if defined(USE_ROS1)
+    ros::shutdown();
+#elif defined(USE_ROS2)
+    if (rclcpp::ok())
+    {
+        rclcpp::shutdown();
+    }
+#endif
+}
+
 void RL_Real::LogDogUsbStatus(bool safe_state, bool usb_timeout, bool remote_timeout, bool serial_connected)
 {
     if (!this->dog_usb_status_initialized || this->dog_usb_last_safe_state != safe_state)
@@ -485,8 +614,29 @@ void RL_Real::LogDogUsbStatus(bool safe_state, bool usb_timeout, bool remote_tim
     this->dog_usb_last_serial_connected = serial_connected;
 }
 
+void RL_Real::ResetCommandSmoothing()
+{
+    this->command_smoothing_reset_requested_ = true;
+}
+
+std::vector<float> RL_Real::SmoothCommands(const std::vector<float>& target_commands, float dt)
+{
+    return rl_command::SmoothCommands(
+        target_commands, dt, this->smoothed_commands_,
+        this->command_smoothing_initialized_, this->command_smoothing_reset_requested_);
+}
+
 void RL_Real::ApplyDogUsbControl(bool emit_events)
 {
+    if (this->dog_usb_exit_requested)
+    {
+        this->control.x = 0.0f;
+        this->control.y = 0.0f;
+        this->control.yaw = 0.0f;
+        this->ResetCommandSmoothing();
+        return;
+    }
+
     if (!this->dog_usb_enable || !this->dog_usb_receiver)
     {
         return;
@@ -526,15 +676,17 @@ void RL_Real::ApplyDogUsbControl(bool emit_events)
 
     if (dog_control_valid)
     {
-        this->control.x = static_cast<float>(state.x);
-        this->control.y = static_cast<float>(state.y);
-        this->control.yaw = static_cast<float>(state.yaw);
+        const rl_command::PlanarCommand planar = rl_command::ShapePlanarCommand(static_cast<float>(state.x), static_cast<float>(state.y));
+        this->control.x = planar.x;
+        this->control.y = planar.y;
+        this->control.yaw = rl_command::ShapeYawCommand(static_cast<float>(state.yaw));
     }
     else if (channel_owns || dog_safe || remote_timeout || !serial_connected)
     {
         this->control.x = 0.0f;
         this->control.y = 0.0f;
         this->control.yaw = 0.0f;
+        this->ResetCommandSmoothing();
     }
 
     if (!emit_events || !usb_fresh)
@@ -542,12 +694,41 @@ void RL_Real::ApplyDogUsbControl(bool emit_events)
         return;
     }
 
+    const uint16_t kBtnSwL1 = static_cast<uint16_t>(1u << this->dog_usb_l1_button_bit);
     constexpr uint16_t kBtnSwL2 = 1u << 9;
     constexpr uint16_t kBtnSwR1 = 1u << 10;
     constexpr uint16_t kBtnSwR2 = 1u << 11;
 
     const uint16_t buttons = state.buttons;
     const uint16_t prev_buttons = this->dog_usb_prev_buttons;
+
+    if (this->dog_usb_l1_off_exit)
+    {
+        const bool l1_now = (buttons & kBtnSwL1) != 0;
+        const bool l1_prev = (prev_buttons & kBtnSwL1) != 0;
+        if (l1_now)
+        {
+            if (!this->dog_usb_l1_seen_on)
+            {
+                std::cout << LOGGER::INFO
+                          << "[dog_usb] L1 ON armed for OFF exit, buttons=0x"
+                          << std::hex << buttons << std::dec
+                          << " remote_age_ms=" << state.last_remote_age_ms
+                          << std::endl;
+            }
+            this->dog_usb_l1_seen_on = true;
+        }
+        else if (this->dog_usb_l1_seen_on && l1_prev)
+        {
+            std::cout << LOGGER::WARNING
+                      << "[dog_usb] L1 OFF edge detected, buttons=0x"
+                      << std::hex << buttons
+                      << " prev=0x" << prev_buttons << std::dec
+                      << " remote_age_ms=" << state.last_remote_age_ms
+                      << std::endl;
+            this->RequestDogUsbExit("L1_OFF_Exit");
+        }
+    }
 
     if (dog_control_valid)
     {
@@ -584,10 +765,13 @@ void RL_Real::RobotControl()
 {
     this->GetState(&this->robot_state);
     this->ApplyDogUsbControl(true);
+    this->HoldDogUsbExitInputs();
     this->StateController(&this->robot_state, &this->robot_command);
     this->ApplyDogUsbControl(false);
+    this->UpdateDogUsbExitShutdown();
     this->control.ClearInput();
     this->SetCommand(&this->robot_command);
+    this->ShutdownDogUsbExitIfReady();
 
     // joint_state_msg_.header.stamp = this->now();
     // joint_state_msg_.name = joint_names_;
@@ -612,19 +796,20 @@ void RL_Real::RunModel()
         this->episode_length_buf += 1;
         this->obs.ang_vel = this->robot_state.imu.gyroscope;
         this->ApplyDogUsbControl(false);
-        this->obs.commands = {this->control.x, this->control.y, this->control.yaw};
+        std::vector<float> target_commands = {this->control.x, this->control.y, this->control.yaw};
 #if !defined(USE_CMAKE)
         if (this->control.navigation_mode)
         {
-            this->obs.commands = {(float)this->cmd_vel.linear.x, (float)this->cmd_vel.linear.y, (float)this->cmd_vel.angular.z};
+            target_commands = {(float)this->cmd_vel.linear.x, (float)this->cmd_vel.linear.y, (float)this->cmd_vel.angular.z};
         }
 #endif
-        // 命令统一裁剪到 motion 覆盖范围(键盘累加无上限/摇杆满偏都会超范围,
-        // 超出后 AMP policy 外推退化: 后退下蹲、横移>1.2变后退)。
-        // vx 后退motion到-0.77,前进到1.23; vy 纯横移motion仅到0.50; wz 转向motion到1.02
-        this->obs.commands[0] = this->obs.commands[0] < -0.7f ? -0.7f : (this->obs.commands[0] > 1.2f ? 1.2f : this->obs.commands[0]);
-        this->obs.commands[1] = this->obs.commands[1] < -0.6f ? -0.6f : (this->obs.commands[1] > 0.6f ? 0.6f : this->obs.commands[1]);
-        this->obs.commands[2] = this->obs.commands[2] < -1.0f ? -1.0f : (this->obs.commands[2] > 1.0f ? 1.0f : this->obs.commands[2]);
+        // Final safety net for keyboard/nav/abnormal command sources.
+        // Normal joystick and DOG_CTRL inputs are shaped before this point.
+        target_commands = rl_command::ClampCommands(target_commands);
+        const float command_dt = std::max(
+            this->params.Get<float>("dt") * static_cast<float>(this->params.Get<int>("decimation")),
+            1.0e-4f);
+        this->obs.commands = this->SmoothCommands(target_commands, command_dt);
         this->obs.base_quat = this->robot_state.imu.quaternion;
         this->obs.dof_pos = this->robot_state.motor_state.q;
         this->obs.dof_vel = this->robot_state.motor_state.dq;

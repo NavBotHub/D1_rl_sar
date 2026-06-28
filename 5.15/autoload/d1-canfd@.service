@@ -2,11 +2,13 @@
 Description=Configure CAN FD interface %i (1M arbitration / 5M data / FD on)
 BindsTo=sys-subsystem-net-devices-%i.device
 After=sys-subsystem-net-devices-%i.device d1-gs-usb.service
+StartLimitIntervalSec=30
+StartLimitBurst=30
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStartPre=-/sbin/ip link set %i down
-ExecStart=/sbin/ip link set %i type can bitrate 1000000 dbitrate 5000000 sample-point 0.75 dsample-point 0.875 fd on
-ExecStartPost=/sbin/ip link set %i up
+ExecStart=/bin/sh -c 'for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do /sbin/ip link set %i down >/dev/null 2>&1 || true; if /sbin/ip link set %i type can bitrate 1000000 dbitrate 5000000 sample-point 0.75 dsample-point 0.875 restart-ms 100 fd on >/dev/null 2>&1 && /sbin/ip link set %i txqueuelen 1000 >/dev/null 2>&1 && /sbin/ip link set %i up >/dev/null 2>&1; then exit 0; fi; sleep 0.5; done; /sbin/ip -details link show %i || true; /sbin/ip link set %i down || true; /sbin/ip link set %i type can bitrate 1000000 dbitrate 5000000 sample-point 0.75 dsample-point 0.875 restart-ms 100 fd on && /sbin/ip link set %i txqueuelen 1000 && /sbin/ip link set %i up'
 ExecStop=-/sbin/ip link set %i down
+Restart=on-failure
+RestartSec=1s

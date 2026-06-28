@@ -37,6 +37,8 @@
 #include "dmbot_serial/protocol/socketcan.h"
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <cerrno>
+#include <cstring>
 #include <utility>
 #include <linux/can.h>        
 #include <linux/can/raw.h> 
@@ -55,13 +57,13 @@ SocketCAN::~SocketCAN()
     this->close();
 }
 
-void SocketCAN::log_throttled_error(const std::string& interface_name) const{
+void SocketCAN::log_throttled_error(const std::string& interface_name, const std::string& reason) const{
   static auto last_log_time = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
   std::chrono::duration<double> elapsed = now - last_log_time;
 
   if (elapsed.count() >= 5.0) {
-      std::cerr << "Unable to write: Socket " << interface_name << " not open" << std::endl;
+      std::cerr << "Unable to write on " << interface_name << ": " << reason << std::endl;
       last_log_time = now;
   }
 }
@@ -72,6 +74,8 @@ bool SocketCAN::open(const std::string& interface, boost::function<void(const ca
 {
   //在static void* socketcan_receiver_thread(void* argv)这个函数里
   //sock->reception_handler(rx_frame);
+  interface_name_ = interface;
+  thread_priority_ = thread_priority;
   reception_handler = std::move(handler);
   // Request a socket
   sock_fd_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);//socket() 函数返回一个 socketcan 的句柄，后续的操作都是基于这个句柄的。
@@ -90,13 +94,13 @@ bool SocketCAN::open(const std::string& interface, boost::function<void(const ca
     return false;
   }
   char name[16] = {};  // avoid stringop-truncation
-  strncpy(name, interface.c_str(), interface.size());
-  strncpy(interface_request_.ifr_name, name, IFNAMSIZ);
+  std::strncpy(name, interface.c_str(), sizeof(name) - 1);
+  std::strncpy(interface_request_.ifr_name, name, IFNAMSIZ - 1);
   // Get the index of the network interface
   if (ioctl(sock_fd_, SIOCGIFINDEX, &interface_request_) == -1)
   {
     //ROS_ERROR("Unable to select CAN interface %s: I/O control error", name);
-    std::cerr << "[ERROR] Unable to select CAN interface " << name << ": I/O control error" << std::endl;
+    std::cerr << "[ERROR] Unable to select CAN interface " << name << ": " << std::strerror(errno) << std::endl;
     // Invalidate unusable socket
     close();
     return false;
@@ -108,7 +112,7 @@ bool SocketCAN::open(const std::string& interface, boost::function<void(const ca
   if (rc == -1)
   {
     //ROS_ERROR("Failed to bind socket to %s network interface", name);
-    std::cerr << "[ERROR] Failed to bind socket to " << name << " network interface" << std::endl;
+    std::cerr << "[ERROR] Failed to bind socket to " << name << " network interface: " << std::strerror(errno) << std::endl;
     close();
     return false;
   }
@@ -134,30 +138,82 @@ bool SocketCAN::isOpen() const
   return (sock_fd_ != -1);
 }
 
-void SocketCAN::write(can_frame* frame) const
+bool SocketCAN::should_reopen_on_error(int error_code) const
+{
+  return error_code == ENXIO || error_code == ENODEV || error_code == ENETDOWN || error_code == ENETUNREACH;
+}
+
+bool SocketCAN::reopen_if_needed(int error_code)
+{
+  if (!should_reopen_on_error(error_code) || interface_name_.empty())
+  {
+    return false;
+  }
+
+  auto now = std::chrono::steady_clock::now();
+  if (last_reopen_attempt_.time_since_epoch().count() != 0 &&
+      std::chrono::duration<double>(now - last_reopen_attempt_).count() < 1.0)
+  {
+    return false;
+  }
+  last_reopen_attempt_ = now;
+
+  std::cerr << "[WARNING] Reopening CAN socket " << interface_name_
+            << " after write error: " << std::strerror(error_code) << std::endl;
+
+  auto handler = reception_handler;
+  close();
+  return open(interface_name_, handler, thread_priority_);
+}
+
+void SocketCAN::write(can_frame* frame)
 {
   if (!isOpen())
   {
     //ROS_ERROR_THROTTLE(5., "Unable to write: Socket %s not open", interface_request_.ifr_name);
-    log_throttled_error(interface_request_.ifr_name);
+    const std::string interface_name = interface_name_.empty() ? interface_request_.ifr_name : interface_name_;
+    log_throttled_error(interface_name, "socket is not open");
+    if (reopen_if_needed(ENODEV) && ::write(sock_fd_, frame, sizeof(can_frame)) != -1)
+    {
+      return;
+    }
     return;
   }
   if (::write(sock_fd_, frame, sizeof(can_frame)) == -1)
+  {
+    const int error_code = errno;
     //ROS_DEBUG_THROTTLE(5., "Unable to write: The %s tx buffer may be full", interface_request_.ifr_name);
-    log_throttled_error(interface_request_.ifr_name);
+    log_throttled_error(interface_request_.ifr_name, std::strerror(error_code));
+    if (reopen_if_needed(error_code))
+    {
+      ::write(sock_fd_, frame, sizeof(can_frame));
+    }
+  }
 }
 
-void SocketCAN::write2(canfd_frame* frame) const
+void SocketCAN::write2(canfd_frame* frame)
 {
   if (!isOpen())
   {
     //ROS_ERROR_THROTTLE(5., "Unable to write: Socket %s not open", interface_request_.ifr_name);
-    log_throttled_error(interface_request_.ifr_name);
+    const std::string interface_name = interface_name_.empty() ? interface_request_.ifr_name : interface_name_;
+    log_throttled_error(interface_name, "socket is not open");
+    if (reopen_if_needed(ENODEV) && ::write(sock_fd_, frame, sizeof(canfd_frame)) != -1)
+    {
+      return;
+    }
     return;
   }
   if (::write(sock_fd_, frame, sizeof(canfd_frame)) == -1)
+  {
+    const int error_code = errno;
     //ROS_DEBUG_THROTTLE(5., "Unable to write: The %s tx buffer may be full", interface_request_.ifr_name);
-    log_throttled_error(interface_request_.ifr_name);
+    log_throttled_error(interface_request_.ifr_name, std::strerror(error_code));
+    if (reopen_if_needed(error_code))
+    {
+      ::write(sock_fd_, frame, sizeof(canfd_frame));
+    }
+  }
 }
 
 static void* socketcan_receiver_thread(void* argv)

@@ -74,10 +74,22 @@ git submodule update --init --recursive --recommend-shallow --progress
 
 ```bash
 # Ubuntu
-sudo apt install cmake g++ build-essential libyaml-cpp-dev libeigen3-dev libboost-all-dev libspdlog-dev libfmt-dev libtbb-dev liblcm-dev
+sudo apt install -y cmake g++ build-essential libyaml-cpp-dev libeigen3-dev libboost-dev libboost-all-dev libspdlog-dev libfmt-dev libtbb-dev liblcm-dev libglfw3-dev libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
 
 # macOS
 brew install boost lcm yaml-cpp tbb libomp pkg-config glfw
+```
+
+`libtbb-dev` 提供 MuJoCo / CMake 编译需要的 TBB CMake 包配置文件。如果 `./build.sh -mj` 报 `TBBConfig.cmake` 或 `tbb-config.cmake` 缺失，单独安装：
+
+```bash
+sudo apt install -y libtbb-dev
+```
+
+`libglfw3-dev` 提供 MuJoCo 可视化编译需要的 GLFW CMake 包配置文件。如果 `./build.sh -mj` 报 `glfw3Config.cmake` 或 `glfw3-config.cmake` 缺失，安装 OpenGL / X11 开发包：
+
+```bash
+sudo apt install -y libglfw3-dev libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
 ```
 
 如果需要使用ROS，安装下列依赖包：

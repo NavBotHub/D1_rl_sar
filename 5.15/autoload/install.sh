@@ -42,10 +42,19 @@ modprobe can_raw || true
 modprobe can_dev || true
 systemctl start d1-gs-usb.service
 udevadm trigger --subsystem-match=net --action=add
+udevadm settle --timeout=10 || true
+for IF in can1 can2; do
+  if [[ -d /sys/class/net/$IF ]]; then
+    systemctl reset-failed "d1-canfd@${IF}.service" 2>/dev/null || true
+    systemctl restart "d1-canfd@${IF}.service" || true
+  fi
+done
 
 echo
 echo "完成。状态预览："
 systemctl --no-pager --full status d1-gs-usb.service | sed -n '1,5p' || true
+echo "当前 CAN 设备："
+ip -brief link show type can 2>/dev/null || true
 for IF in can1 can2; do
   if [[ -d /sys/class/net/$IF ]]; then
     systemctl --no-pager --full status "d1-canfd@${IF}.service" 2>/dev/null | sed -n '1,5p' || true

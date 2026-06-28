@@ -172,7 +172,20 @@ public:
         try
         {
             rl.InitRL(robot_config_path);
+            rl.ResetCommandSmoothing();
             rl.now_state = *fsm_state;
+            rl.obs.ang_vel = fsm_state->imu.gyroscope;
+            rl.obs.base_quat = fsm_state->imu.quaternion;
+            rl.obs.dof_pos = fsm_state->motor_state.q;
+            rl.obs.dof_vel = fsm_state->motor_state.dq;
+            rl.obs.commands = {0.0f, 0.0f, 0.0f};
+            rl.obs.actions.assign(rl.params.Get<int>("num_of_dofs"), 0.0f);
+
+            const std::vector<float> first_obs = rl.ComputeObservation();
+            if (!rl.params.Get<std::vector<int>>("observations_history").empty())
+            {
+                rl.history_obs_buf.reset({0}, first_obs);
+            }
         }
         catch (const std::exception& e)
         {
