@@ -349,6 +349,7 @@ Regular ROS2 build:
 cd ~/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 export CMAKE_BUILD_PARALLEL_LEVEL=1
+chmod +x build.sh
 ./build.sh
 ```
 
