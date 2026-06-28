@@ -536,10 +536,25 @@ bool RLFSMState::Interpolate(
     const std::vector<float>& target_pos,
     float duration_seconds,
     const std::string& description,
-    bool use_fixed_gains)
+    bool use_fixed_gains,
+    bool hold_target_when_done)
 {
+    auto kp = use_fixed_gains ? rl.params.Get<std::vector<float>>("fixed_kp") : rl.params.Get<std::vector<float>>("rl_kp");
+    auto kd = use_fixed_gains ? rl.params.Get<std::vector<float>>("fixed_kd") : rl.params.Get<std::vector<float>>("rl_kd");
+
     if (percent >= 1.0f)
     {
+        if (hold_target_when_done)
+        {
+            for (int i = 0; i < rl.params.Get<int>("num_of_dofs"); ++i)
+            {
+                fsm_command->motor_command.q[i] = target_pos[i];
+                fsm_command->motor_command.dq[i] = 0;
+                fsm_command->motor_command.kp[i] = kp[i];
+                fsm_command->motor_command.kd[i] = kd[i];
+                fsm_command->motor_command.tau[i] = 0;
+            }
+        }
         return false;
     }
 
@@ -562,9 +577,6 @@ bool RLFSMState::Interpolate(
 
     percent += step;
     percent = std::min(percent, 1.0f);
-
-    auto kp = use_fixed_gains ? rl.params.Get<std::vector<float>>("fixed_kp") : rl.params.Get<std::vector<float>>("rl_kp");
-    auto kd = use_fixed_gains ? rl.params.Get<std::vector<float>>("fixed_kd") : rl.params.Get<std::vector<float>>("rl_kd");
 
     for (int i = 0; i < rl.params.Get<int>("num_of_dofs"); ++i)
     {

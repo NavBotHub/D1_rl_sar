@@ -215,6 +215,7 @@ public:
     std::vector<float> ComputeObservation();
     virtual void GetState(RobotState<float> *state) = 0;
     virtual void SetCommand(const RobotCommand<float> *command) = 0;
+    virtual void ResetCommandSmoothing() {}
     void StateController(const RobotState<float> *state, RobotCommand<float> *command);
     void ComputeOutput(const std::vector<float> &actions, std::vector<float> &output_dof_pos, std::vector<float> &output_dof_vel, std::vector<float> &output_dof_tau);
 
@@ -277,7 +278,8 @@ public:
         const std::vector<float>& target_pos,
         float duration_seconds,
         const std::string& description = "",
-        bool use_fixed_gains = true
+        bool use_fixed_gains = true,
+        bool hold_target_when_done = false
     );
 
     void RLControl();
