@@ -663,6 +663,8 @@ Use the DaMiao debug assistant's parameter page to modify each motor. After conf
 
 ![DaMiao debug assistant DM6248P parameters](docs/images/dm_debug_tool_dm6248p_params.png)
 
+![Motor ID](docs/images/nano.drawio.png)
+
 ### 6.2 Motor Zero Calibration
 
 D1 uses DaMiao `DM6248P` motors. The zero point is written into each motor's FLASH and is retained after power-off. Calibrate after first deployment, motor replacement, or mechanical reassembly.
