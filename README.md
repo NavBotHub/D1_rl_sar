@@ -227,7 +227,7 @@ docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
 Install it with:
 
 ```bash
-cd $HOME/project/d1_rl_sar
+cd $HOME/project/D1_rl_sar
 sudo bash docs/dtb/install_dmgo_dtb.sh
 sudo reboot
 ```
@@ -273,7 +273,7 @@ Normal DOG_CTRL frames start with:
 This README assumes the repository is located at:
 
 ```bash
-~/project/d1_rl_sar
+~/project/D1_rl_sar
 ```
 
 Clone:
@@ -282,7 +282,7 @@ Clone:
 mkdir -p ~/project
 cd ~/project
 git clone --recursive https://github.com/NavBotHub/D1_rl_sar
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 ```
 
 ### 4.2 Install Base Dependencies
@@ -337,7 +337,7 @@ When running the command below on Jetson, the script prefers this local archive 
 Note: this bundled archive is for `aarch64` and is intended for Jetson. If you run the script on an x86_64 Ubuntu / WSL development machine, it will look for an x64 archive instead of using the aarch64 package.
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 bash scripts/download_inference_runtime.sh onnx
 ```
 
@@ -346,7 +346,7 @@ bash scripts/download_inference_runtime.sh onnx
 Regular ROS2 build:
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 export CMAKE_BUILD_PARALLEL_LEVEL=1
 ./build.sh
@@ -392,8 +392,8 @@ After a successful build, append ROS and workspace setup to `~/.bashrc`:
 cat >> ~/.bashrc <<'EOF'
 
 source /opt/ros/humble/setup.bash
-if [ -f "$HOME/project/d1_rl_sar/rl_sar/install/setup.bash" ]; then
-  source "$HOME/project/d1_rl_sar/rl_sar/install/setup.bash"
+if [ -f "$HOME/project/D1_rl_sar/rl_sar/install/setup.bash" ]; then
+  source "$HOME/project/D1_rl_sar/rl_sar/install/setup.bash"
 fi
 EOF
 ```
@@ -418,7 +418,7 @@ Start IMU. The tested port is `/dev/ttyACM0`:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run dm_imu dm_imu_node --ros-args -p port:=/dev/ttyACM0 -p baud:=921600
 ```
 
@@ -426,7 +426,7 @@ In another terminal:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 topic echo /imu/data --once
 ```
 
@@ -475,7 +475,7 @@ sudo apt install -y build-essential nvidia-l4t-kernel-headers
 uname -r
 ls -ld /lib/modules/$(uname -r)/build
 
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 make clean
 make
 
@@ -493,7 +493,7 @@ If a repeated `insmod` prints `File exists`, the module is already loaded; this 
 The repository provides an autoload installer:
 
 ```bash
-cd ~/project/d1_rl_sar/5.15/autoload
+cd ~/project/D1_rl_sar/5.15/autoload
 sudo bash install.sh
 ```
 
@@ -506,7 +506,7 @@ The script installs:
 | `/etc/udev/rules.d/85-d1-canfd.rules` | Watch CAN network interfaces created by `gs_usb` |
 | `/etc/systemd/system/d1-canfd@.service` | Configure `1M arbitration / 5M data / restart-ms 100 / FD on`, set `txqueuelen 1000`, and bring the interface up |
 
-Note: `install.sh` writes the absolute path of the current `5.15/gs_usb.ko` into `/etc/systemd/system/d1-gs-usb.service`. If you move the repository or want to confirm the path after rebuilding, run `sudo bash ~/project/d1_rl_sar/5.15/autoload/install.sh` again.
+Note: `install.sh` writes the absolute path of the current `5.15/gs_usb.ko` into `/etc/systemd/system/d1-gs-usb.service`. If you move the repository or want to confirm the path after rebuilding, run `sudo bash ~/project/D1_rl_sar/5.15/autoload/install.sh` again.
 
 Check status:
 
@@ -526,13 +526,13 @@ Expected:
 Uninstall autoload:
 
 ```bash
-sudo bash ~/project/d1_rl_sar/5.15/autoload/uninstall.sh
+sudo bash ~/project/D1_rl_sar/5.15/autoload/uninstall.sh
 ```
 
 If the Jetson kernel is upgraded, rebuild `gs_usb.ko`:
 
 ```bash
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 make clean && make
 sudo systemctl restart d1-gs-usb.service
 ```
@@ -542,7 +542,7 @@ sudo systemctl restart d1-gs-usb.service
 If autoload is not installed, configure CANFD manually:
 
 ```bash
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 sudo modprobe can
 sudo modprobe can_raw
 sudo modprobe can_dev
@@ -684,7 +684,7 @@ Whole-robot calibration:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run dmbot_serial set_zero_all
 ```
 
@@ -718,7 +718,7 @@ One-command launch, suitable for Jetson sessions with a graphical environment:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 launch rl_sar rl_real_d1.launch.py
 ```
 
@@ -746,7 +746,7 @@ Terminal 1:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run dm_imu dm_imu_node --ros-args -p port:=/dev/ttyACM0 -p baud:=921600
 ```
 
@@ -754,7 +754,7 @@ Terminal 2:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run rl_sar rl_real_d1
 ```
 
@@ -840,7 +840,7 @@ dog_usb_l1_exit_timeout_ms:=8000
 To verify that the parameters are installed in the current workspace:
 
 ```bash
-cd $HOME/project/d1_rl_sar/rl_sar
+cd $HOME/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch rl_sar rl_real_d1_headless.launch.py --show-args | grep dog_usb_l1
@@ -849,7 +849,7 @@ ros2 launch rl_sar rl_real_d1_headless.launch.py --show-args | grep dog_usb_l1
 After updating service templates, rebuild first so the templates under `install/share/rl_sar/systemd/` are refreshed, then run the installer. The installer writes the current workspace path to `/etc/default/rl-sar`, so any deployment user can use the same flow:
 
 ```bash
-cd $HOME/project/d1_rl_sar/rl_sar
+cd $HOME/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 ./build.sh rl_sar
 sudo bash install/share/rl_sar/systemd/install_rl_sar_services.sh
@@ -866,7 +866,7 @@ Watch for:
 - Whether `started rl-sar-main.service` appears after `L1 ON`.
 - Whether `L1 OFF edge detected` appears after `L1 OFF`.
 - Whether `rl-sar-main.service` becomes inactive after `rl_real_d1` exits.
-- If logs show `cd: ... No such file or directory`, `RL_SAR_ROOT` in `/etc/default/rl-sar` is wrong. Run `cat /etc/default/rl-sar`; it should show the current workspace path, for example `$HOME/project/d1_rl_sar/rl_sar`.
+- If logs show `cd: ... No such file or directory`, `RL_SAR_ROOT` in `/etc/default/rl-sar` is wrong. Run `cat /etc/default/rl-sar`; it should show the current workspace path, for example `$HOME/project/D1_rl_sar/rl_sar`.
 - If ROS nodes fail with `failed to configure logging: Failed to get logging directory`, reinstall the service templates. The templates set absolute `ROS_HOME` and `ROS_LOG_DIR` paths for systemd.
 - If `L1 OFF` does not work, first confirm `dog_usb_l1_button_bit:=8`. If the field BTN bit differs, change only this bit.
 - If `OFF` exits motor control but the next `ON` does not respond, first confirm `rl_real_d1_headless.launch.py` includes `OnProcessExit -> Shutdown`, and that `install_rl_sar_services.sh` has been rerun.
@@ -878,14 +878,14 @@ MuJoCo is used for simulation or real-to-sim mapping checks. It is not part of t
 Download MuJoCo:
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 bash scripts/download_mujoco.sh
 ```
 
 Build MuJoCo:
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 ./build.sh -mj
 ```
 
@@ -918,7 +918,7 @@ Real robot to MuJoCo mapping check:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 launch rl_sar rl_real2mujoco.launch.py
 ```
 
@@ -953,7 +953,7 @@ systemctl --no-pager status d1-gs-usb.service 'd1-canfd@can1.service' 'd1-canfd@
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 launch rl_sar rl_real_d1.launch.py
 ```
 
@@ -968,7 +968,7 @@ ros2 launch rl_sar rl_real_d1.launch.py
 Rebuild and source:
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 ./build.sh
 source install/setup.bash
@@ -1001,7 +1001,7 @@ Confirm the USB-CANFD device has been flashed with socketcan firmware, then re-p
 A common cause is a stale `gs_usb.ko` after kernel upgrade:
 
 ```bash
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 make clean && make
 sudo systemctl restart d1-gs-usb.service
 ```
@@ -1029,7 +1029,7 @@ Install the missing graphics dependencies and rebuild:
 ```bash
 sudo apt update
 sudo apt install -y libglfw3-dev libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 rm -rf cmake_build
 ./build.sh -mj
 ```

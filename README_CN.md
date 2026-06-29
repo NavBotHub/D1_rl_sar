@@ -227,7 +227,7 @@ docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
 安装命令：
 
 ```bash
-cd $HOME/project/d1_rl_sar
+cd $HOME/project/D1_rl_sar
 sudo bash docs/dtb/install_dmgo_dtb.sh
 sudo reboot
 ```
@@ -273,7 +273,7 @@ sudo timeout 2s cat /dev/ttyTHS1 | xxd -g 1 -c 24 | head
 本文假设仓库位于：
 
 ```bash
-~/project/d1_rl_sar
+~/project/D1_rl_sar
 ```
 
 克隆：
@@ -282,7 +282,7 @@ sudo timeout 2s cat /dev/ttyTHS1 | xxd -g 1 -c 24 | head
 mkdir -p ~/project
 cd ~/project
 git clone --recursive https://github.com/NavBotHub/D1_rl_sar
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 ```
 
 ### 4.2 安装基础依赖
@@ -337,7 +337,7 @@ rl_sar/third_party/onnxruntime/onnxruntime-linux-aarch64-1.22.0.tgz
 注意：这个内置包是 `aarch64` 架构，只给 Jetson 使用；如果在 x86_64 的 Ubuntu / WSL 开发机上执行，脚本会按当前机器架构查找 x64 包，不会使用这个 aarch64 包。
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 bash scripts/download_inference_runtime.sh onnx
 ```
 
@@ -346,7 +346,7 @@ bash scripts/download_inference_runtime.sh onnx
 普通 ROS2 编译：
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 export CMAKE_BUILD_PARALLEL_LEVEL=1
 ./build.sh
@@ -392,8 +392,8 @@ dm_imu dm_imu_node
 cat >> ~/.bashrc <<'EOF'
 
 source /opt/ros/humble/setup.bash
-if [ -f "$HOME/project/d1_rl_sar/rl_sar/install/setup.bash" ]; then
-  source "$HOME/project/d1_rl_sar/rl_sar/install/setup.bash"
+if [ -f "$HOME/project/D1_rl_sar/rl_sar/install/setup.bash" ]; then
+  source "$HOME/project/D1_rl_sar/rl_sar/install/setup.bash"
 fi
 EOF
 ```
@@ -418,7 +418,7 @@ newgrp dialout
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run dm_imu dm_imu_node --ros-args -p port:=/dev/ttyACM0 -p baud:=921600
 ```
 
@@ -426,7 +426,7 @@ ros2 run dm_imu dm_imu_node --ros-args -p port:=/dev/ttyACM0 -p baud:=921600
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 topic echo /imu/data --once
 ```
 
@@ -475,7 +475,7 @@ sudo apt install -y build-essential nvidia-l4t-kernel-headers
 uname -r
 ls -ld /lib/modules/$(uname -r)/build
 
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 make clean
 make
 
@@ -493,7 +493,7 @@ sudo insmod ./gs_usb.ko
 仓库已经提供自动加载脚本：
 
 ```bash
-cd ~/project/d1_rl_sar/5.15/autoload
+cd ~/project/D1_rl_sar/5.15/autoload
 sudo bash install.sh
 ```
 
@@ -506,7 +506,7 @@ sudo bash install.sh
 | `/etc/udev/rules.d/85-d1-canfd.rules` | 监听 `gs_usb` 生成的 CAN 网卡 |
 | `/etc/systemd/system/d1-canfd@.service` | 自动配置 `1M arbitration / 5M data / restart-ms 100 / FD on`，设置 `txqueuelen 1000` 并拉起接口 |
 
-注意：`install.sh` 会把当前 `5.15/gs_usb.ko` 的绝对路径写入 `/etc/systemd/system/d1-gs-usb.service`。如果后续移动了仓库目录，或者重新编译后想确认路径正确，建议重新执行一次 `sudo bash ~/project/d1_rl_sar/5.15/autoload/install.sh`。
+注意：`install.sh` 会把当前 `5.15/gs_usb.ko` 的绝对路径写入 `/etc/systemd/system/d1-gs-usb.service`。如果后续移动了仓库目录，或者重新编译后想确认路径正确，建议重新执行一次 `sudo bash ~/project/D1_rl_sar/5.15/autoload/install.sh`。
 
 检查状态：
 
@@ -526,13 +526,13 @@ ip -d link show can2
 卸载自动加载：
 
 ```bash
-sudo bash ~/project/d1_rl_sar/5.15/autoload/uninstall.sh
+sudo bash ~/project/D1_rl_sar/5.15/autoload/uninstall.sh
 ```
 
 如果 Jetson 内核升级，必须重新编译 `gs_usb.ko`：
 
 ```bash
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 make clean && make
 sudo systemctl restart d1-gs-usb.service
 ```
@@ -542,7 +542,7 @@ sudo systemctl restart d1-gs-usb.service
 如果没有安装自动加载，手动执行：
 
 ```bash
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 sudo modprobe can
 sudo modprobe can_raw
 sudo modprobe can_dev
@@ -684,7 +684,7 @@ D1 使用达妙 `DM6248P` 电机。零点写入每颗电机自己的 FLASH，断
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run dmbot_serial set_zero_all
 ```
 
@@ -718,7 +718,7 @@ CAN ID 对应关系：
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 launch rl_sar rl_real_d1.launch.py
 ```
 
@@ -746,7 +746,7 @@ ros2 launch rl_sar rl_real_d1.launch.py port:=/dev/ttyACM1 baud:=921600
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run dm_imu dm_imu_node --ros-args -p port:=/dev/ttyACM0 -p baud:=921600
 ```
 
@@ -754,7 +754,7 @@ ros2 run dm_imu dm_imu_node --ros-args -p port:=/dev/ttyACM0 -p baud:=921600
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 run rl_sar rl_real_d1
 ```
 
@@ -857,7 +857,7 @@ dog_usb_l1_exit_timeout_ms:=8000
 如需前台验证参数是否已经安装到当前工作区：
 
 ```bash
-cd $HOME/project/d1_rl_sar/rl_sar
+cd $HOME/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch rl_sar rl_real_d1_headless.launch.py --show-args | grep dog_usb_l1
@@ -866,7 +866,7 @@ ros2 launch rl_sar rl_real_d1_headless.launch.py --show-args | grep dog_usb_l1
 更新 service 模板后，需要先重新构建，让 `install/share/rl_sar/systemd/` 里的模板同步更新，再运行安装脚本。脚本会按当前工作区路径写入 `/etc/default/rl-sar`，因此不同用户名都可以使用同一套流程：
 
 ```bash
-cd $HOME/project/d1_rl_sar/rl_sar
+cd $HOME/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 ./build.sh rl_sar
 sudo bash install/share/rl_sar/systemd/install_rl_sar_services.sh
@@ -883,7 +883,7 @@ journalctl -u rl-sar-trigger.service -u rl-sar-main.service -f
 - `L1 ON` 后是否出现 `started rl-sar-main.service`。
 - `L1 OFF` 后是否出现 `L1 OFF edge detected`。
 - `rl_real_d1` 退出后 `rl-sar-main.service` 是否变成 inactive。
-- 如果日志出现 `cd: ... No such file or directory`，说明 `/etc/default/rl-sar` 里的 `RL_SAR_ROOT` 不正确；执行 `cat /etc/default/rl-sar`，应看到当前工作区路径，例如 `$HOME/project/d1_rl_sar/rl_sar`。
+- 如果日志出现 `cd: ... No such file or directory`，说明 `/etc/default/rl-sar` 里的 `RL_SAR_ROOT` 不正确；执行 `cat /etc/default/rl-sar`，应看到当前工作区路径，例如 `$HOME/project/D1_rl_sar/rl_sar`。
 - 如果 ROS 节点报 `failed to configure logging: Failed to get logging directory`，重新安装 service 模板；模板会给 systemd 设置绝对路径的 `ROS_HOME` 和 `ROS_LOG_DIR`。
 - 如果 `L1 OFF` 没反应，优先确认 `dog_usb_l1_button_bit:=8`；如现场 BTN 位不一致，只改这个 bit。
 - 如果 `OFF` 后能退出电机控制但再次 `ON` 没反应，优先确认 `rl_real_d1_headless.launch.py` 已经包含 `OnProcessExit -> Shutdown`，并且已经重新运行 `install_rl_sar_services.sh`。
@@ -895,14 +895,14 @@ MuJoCo 用于仿真或真机映射检查，不是实机最短部署链路的一�
 下载 MuJoCo：
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 bash scripts/download_mujoco.sh
 ```
 
 编译 MuJoCo：
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 ./build.sh -mj
 ```
 
@@ -935,7 +935,7 @@ cd ~/project/d1_rl_sar/rl_sar
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 launch rl_sar rl_real2mujoco.launch.py
 ```
 
@@ -970,7 +970,7 @@ systemctl --no-pager status d1-gs-usb.service 'd1-canfd@can1.service' 'd1-canfd@
 
 ```bash
 source /opt/ros/humble/setup.bash
-source ~/project/d1_rl_sar/rl_sar/install/setup.bash
+source ~/project/D1_rl_sar/rl_sar/install/setup.bash
 ros2 launch rl_sar rl_real_d1.launch.py
 ```
 
@@ -985,7 +985,7 @@ ros2 launch rl_sar rl_real_d1.launch.py
 重新构建并 source：
 
 ```bash
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 source /opt/ros/humble/setup.bash
 ./build.sh
 source install/setup.bash
@@ -1018,7 +1018,7 @@ sudo dmesg | grep -i -E 'gs_usb|can|ttyACM' | tail -n 80
 常见原因是内核升级后旧 `gs_usb.ko` 不匹配：
 
 ```bash
-cd ~/project/d1_rl_sar/5.15
+cd ~/project/D1_rl_sar/5.15
 make clean && make
 sudo systemctl restart d1-gs-usb.service
 ```
@@ -1046,7 +1046,7 @@ Could not find a package configuration file provided by "glfw3"
 ```bash
 sudo apt update
 sudo apt install -y libglfw3-dev libgl1-mesa-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
-cd ~/project/d1_rl_sar/rl_sar
+cd ~/project/D1_rl_sar/rl_sar
 rm -rf cmake_build
 ./build.sh -mj
 ```
