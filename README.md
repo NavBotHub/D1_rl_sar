@@ -224,6 +224,14 @@ Skip this step for the official Jetson Orin Nano developer kit. For the DaMiao t
 docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
 ```
 
+Clone the repository first if it is not already on the Jetson:
+
+```bash
+mkdir -p $HOME/project
+cd $HOME/project
+git clone --recursive https://github.com/NavBotHub/D1_rl_sar.git
+```
+
 Install it with:
 
 ```bash
@@ -281,7 +289,7 @@ Clone:
 ```bash
 mkdir -p ~/project
 cd ~/project
-git clone --recursive https://github.com/NavBotHub/D1_rl_sar
+git clone --recursive https://github.com/NavBotHub/D1_rl_sar.git
 cd ~/project/D1_rl_sar/rl_sar
 ```
 

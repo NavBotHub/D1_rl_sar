@@ -224,6 +224,14 @@ sudo reboot
 docs/dtb/kernel_tegra234-p3768-0000+p3767-0003-nv.dtb
 ```
 
+如果 Jetson 上还没有仓库，先克隆代码：
+
+```bash
+mkdir -p $HOME/project
+cd $HOME/project
+git clone --recursive https://github.com/NavBotHub/D1_rl_sar.git
+```
+
 安装命令：
 
 ```bash
@@ -281,7 +289,7 @@ sudo timeout 2s cat /dev/ttyTHS1 | xxd -g 1 -c 24 | head
 ```bash
 mkdir -p ~/project
 cd ~/project
-git clone --recursive https://github.com/NavBotHub/D1_rl_sar
+git clone --recursive https://github.com/NavBotHub/D1_rl_sar.git
 cd ~/project/D1_rl_sar/rl_sar
 ```
 
