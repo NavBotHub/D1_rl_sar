@@ -178,7 +178,7 @@ private:
     bool replay_headless_ = false;
     bool replay_started_ = false;
     double replay_start_t_ = 0.0;
-    double replay_root_height_ = 0.65;
+    double replay_root_height_ = 0.53;
     std::string replay_qdes_path_;
     std::vector<std::array<float, 12>> replay_qdes_;
 };

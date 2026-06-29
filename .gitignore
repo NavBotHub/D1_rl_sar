@@ -32,7 +32,7 @@ cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
-Makefile
+# CMake-generated Makefiles are covered by ignored build directories.
 compile_commands.json
 *.cmake.user
 
@@ -43,7 +43,9 @@ logs/
 
 # --- Colcon (ROS2) ---
 install/
-log/
+/log/
+/rl_sar/log/
+/rl_sar/ros2 _serial/log/
 
 # --- Project specific common outputs ---
 rl_sar/cmake_build/
@@ -63,7 +65,8 @@ rl_sar/**/cmake_build/
 *.bak_*
 *.orig
 *.core
-core
+/core
+core.[0-9]*
 
 # --- Large/generated simulation data ---
 *.csv

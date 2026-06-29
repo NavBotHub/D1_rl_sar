@@ -22,7 +22,7 @@
   </asset>
 
   <worldbody>
-    <body name="base" pos="0.0 0.0 0.4" quat="1.0 0.0 0.0 0.0">
+    <body name="base" pos="0.0 0.0 0.53" quat="1.0 0.0 0.0 0.0">
       <inertial pos="-0.001955 0.002743 -0.068608" quat="0.00498611 0.706314 0.00376067 0.707871" mass="6.8891" diaginertia="0.10308 0.0811058 0.0359755"/>
       <joint name="floating_base" type="free" limited="false" actuatorfrclimited="false"/>
       <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.882353 0.882353 0.882353 1" mesh="base"/>
@@ -206,7 +206,7 @@
   <keyframe>
     <!-- "home" pose: folded/tucked position (pre_running_pos), base resting on belly -->
     <!-- qpos order: free_joint(x y z qw qx qy qz) + FL(hip thigh calf) FR(hip thigh calf) RL(hip thigh calf) RR(hip thigh calf) -->
-    <key name="home" qpos="0 0 0.135 1 0 0 0
+    <key name="home" qpos="0 0 0.53 1 0 0 0
       0.0 0.0 -2.101
       0.0 0.0 -2.101
       0.0 0.0 -2.101
