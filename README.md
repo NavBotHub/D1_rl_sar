@@ -8,8 +8,6 @@
 ![MuJoCo](https://img.shields.io/badge/MuJoCo-3.2.7-f06c2f)
 [![License](https://img.shields.io/badge/license-GPL--3.0-yellow)](https://github.com/NavBotHub/D1_rl_sar#)
 
-[中文版本](README_CN.md)
-
 > This D1 real-robot deployment guide is validated for Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, ROS 2 Humble, and DaMiao USB-CANFD.
 
 This document describes the real-robot deployment flow for D1 on Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, and ROS 2 Humble. The CAN bus uses a DaMiao `DM-USB2CANFD_Dual` dual-channel USB-CAN FD adapter, the IMU is `DM-IMU-L1`, and the leg motors are DaMiao `DM6248P`.
