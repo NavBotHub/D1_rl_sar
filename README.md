@@ -782,6 +782,15 @@ ros2 run rl_sar rl_real_d1
 
 ![ROS2 gamepad control mapping](docs/images/gamepad_control_en.png)
 
+Start with ROS2 gamepad control only:
+
+```bash
+ros2 launch rl_sar rl_real_d1_headless.launch.py \
+  dog_usb_enable:=false \
+  keyboard_enable:=false \
+  sys_joystick_device:=/dev/input/js0
+```
+
 The program reads the Linux joystick device `/dev/input/js0`. Check:
 
 ```bash
