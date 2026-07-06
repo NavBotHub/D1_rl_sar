@@ -23,7 +23,11 @@ if [[ -f "${PID_FILE}" ]]; then
   fi
 fi
 
-existing_pid="$(pgrep -f "robot_http_control_server.py --host ${HOST} --port ${PORT}" | head -n 1 || true)"
+existing_pid="$(
+  ps -eo pid=,args= |
+    awk -v host="${HOST}" -v port="${PORT}" \
+      '$0 ~ /robot_http_control_server[.]py/ && $0 ~ "--host " host && $0 ~ "--port " port {print $1; exit}'
+)"
 if [[ -n "${existing_pid}" ]]; then
   echo "${existing_pid}" > "${PID_FILE}"
   echo "robot_http_control_server.py is already running: pid ${existing_pid}"

@@ -27,7 +27,11 @@ if [[ -f "${PID_FILE}" ]]; then
   rm -f "${PID_FILE}"
 fi
 
-mapfile -t pids < <(pgrep -f "robot_http_control_server.py .*--port ${PORT}" || true)
+mapfile -t pids < <(
+  ps -eo pid=,args= |
+    awk -v port="${PORT}" \
+      '$0 ~ /robot_http_control_server[.]py/ && $0 ~ "--port " port {print $1}'
+)
 for pid in "${pids[@]}"; do
   [[ -z "${pid}" || "${pid}" == "$$" ]] && continue
   kill "${pid}" 2>/dev/null || true
