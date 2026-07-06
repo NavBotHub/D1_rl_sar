@@ -35,6 +35,13 @@ mapfile -t pids < <(
 for pid in "${pids[@]}"; do
   [[ -z "${pid}" || "${pid}" == "$$" ]] && continue
   kill "${pid}" 2>/dev/null || true
+  for _ in {1..20}; do
+    kill -0 "${pid}" 2>/dev/null || break
+    sleep 0.1
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    kill -9 "${pid}" 2>/dev/null || true
+  fi
   stopped=1
 done
 
