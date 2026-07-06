@@ -466,13 +466,39 @@ class ControlHandler(BaseHTTPRequestHandler):
       font-size: 12px;
       overflow: auto;
     }
+    @supports (min-height: 100dvh) {
+      main { min-height: 100dvh; }
+    }
     @media (max-width: 420px) {
-      main { padding: 14px 12px 18px; gap: 12px; }
+      main { padding: 10px 12px 12px; gap: 8px; }
       h1 { font-size: 21px; }
-      .status { grid-template-columns: repeat(2, 1fr); }
-      .actions { grid-template-columns: 1fr 1fr; }
-      .dpad { grid-template-rows: repeat(3, 68px); gap: 8px; }
-      button { min-height: 46px; font-size: 14px; }
+      .subtitle { font-size: 12px; }
+      .state-pill { min-width: 76px; padding: 6px 8px; }
+      .state-pill b { font-size: 14px; }
+      .status { gap: 6px; padding: 8px; }
+      .metric { min-height: 44px; padding: 6px; font-size: 11px; }
+      .metric b { font-size: 13px; margin-top: 2px; }
+      .panel { padding: 10px; }
+      .section-title { margin-bottom: 8px; font-size: 11px; }
+      .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .remote { gap: 10px; }
+      .dpad { width: min(100%, 292px); grid-template-rows: repeat(3, 60px); gap: 8px; }
+      .turn-row { gap: 8px; }
+      .turn-row .drive-btn { min-height: 54px; }
+      button { min-height: 42px; font-size: 13px; }
+      .drive-btn { font-size: 14px; }
+      .readout { display: none; }
+    }
+    @media (max-width: 420px) and (max-height: 760px) {
+      main { padding-top: 8px; gap: 7px; }
+      .topbar { gap: 8px; }
+      h1 { font-size: 20px; }
+      .status { display: none; }
+      .panel { padding: 9px; }
+      .actions { gap: 7px; }
+      .dpad { grid-template-rows: repeat(3, 56px); gap: 7px; }
+      .turn-row .drive-btn { min-height: 50px; }
+      button { min-height: 40px; }
     }
   </style>
 </head>
