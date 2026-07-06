@@ -956,7 +956,7 @@ void RL_Real::SitdownServiceCallback(
     std::shared_ptr<std_srvs::srv::Trigger::Response> response)
 {
     (void)request;
-    this->control.SetGamepad(Input::Gamepad::B);
+    this->fsm.RequestStateChange("RLFSMStateGetDown");
     response->success = true;
     response->message = "sitdown command queued";
 }
