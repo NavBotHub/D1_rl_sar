@@ -13,6 +13,7 @@ Endpoints:
   POST /api/start
   POST /api/stop
   POST /api/standup
+  POST /api/sitdown
   POST /api/cmd_vel       {"x": 0.2, "y": 0.0, "yaw": 0.1}
   POST /api/cmd_vel/zero
 """
@@ -48,6 +49,7 @@ class RobotHttpController:
         self.node = rclpy.create_node("d1_robot_http_control_server")
         self.cmd_vel_pub = self.node.create_publisher(Twist, "/cmd_vel", 10)
         self.standup_client = self.node.create_client(Trigger, "/rl_sar/standup")
+        self.sitdown_client = self.node.create_client(Trigger, "/rl_sar/sitdown")
 
         self.executor = SingleThreadedExecutor()
         self.executor.add_node(self.node)
@@ -123,8 +125,14 @@ class RobotHttpController:
     def standup_ready(self):
         return self.standup_client.wait_for_service(timeout_sec=0.0)
 
+    def sitdown_ready(self):
+        return self.sitdown_client.wait_for_service(timeout_sec=0.0)
+
     def wait_for_standup(self, timeout):
         return self.standup_client.wait_for_service(timeout_sec=timeout)
+
+    def wait_for_sitdown(self, timeout):
+        return self.sitdown_client.wait_for_service(timeout_sec=timeout)
 
     def call_standup(self):
         if not self.wait_for_standup(self.args.service_timeout):
@@ -137,6 +145,18 @@ class RobotHttpController:
                 return {"ok": bool(response.success), "message": response.message}
             time.sleep(0.05)
         return {"ok": False, "message": "/rl_sar/standup call timed out"}
+
+    def call_sitdown(self):
+        if not self.wait_for_sitdown(self.args.service_timeout):
+            return {"ok": False, "message": "/rl_sar/sitdown service not ready"}
+        future = self.sitdown_client.call_async(Trigger.Request())
+        deadline = time.monotonic() + self.args.service_timeout
+        while time.monotonic() < deadline:
+            if future.done():
+                response = future.result()
+                return {"ok": bool(response.success), "message": response.message}
+            time.sleep(0.05)
+        return {"ok": False, "message": "/rl_sar/sitdown call timed out"}
 
     def publish_cmd_vel(self, x, y, yaw, update_watchdog=True):
         x = clamp(x, -self.args.max_x, self.args.max_x)
@@ -165,6 +185,7 @@ class RobotHttpController:
             "service_active": self.service_active(),
             "service_enabled": self.service_enabled(),
             "standup_ready": self.standup_ready(),
+            "sitdown_ready": self.sitdown_ready(),
             "last_cmd": last_cmd,
             "last_cmd_age_ms": age,
             "limits": {
@@ -213,6 +234,10 @@ class ControlHandler(BaseHTTPRequestHandler):
             standup = self.controller.call_standup() if start["ok"] else {"ok": False, "message": "failed to start service"}
             ok = start["ok"] and standup["ok"]
             self.send_json(200 if ok else 500, {"ok": ok, "start": start, "standup": standup, "status": self.controller.status()})
+            return
+        if self.path == "/api/sitdown":
+            sitdown = self.controller.call_sitdown()
+            self.send_json(200 if sitdown["ok"] else 500, {"ok": sitdown["ok"], "sitdown": sitdown, "status": self.controller.status()})
             return
         if self.path == "/api/cmd_vel":
             payload = self.read_json()
@@ -276,10 +301,12 @@ class ControlHandler(BaseHTTPRequestHandler):
   <div class="status">
     Service: <b id="service">-</b><br>
     State: <b id="state">-</b><br>
-    Standup service: <b id="standupReady">-</b>
+    Standup service: <b id="standupReady">-</b><br>
+    Sitdown service: <b id="sitdownReady">-</b>
   </div>
   <button class="primary" onclick="post('/api/start')">Start</button>
   <button class="standup" onclick="confirmPost('/api/standup','Stand up the robot? Confirm it is in a safe test area.')">Stand Up</button>
+  <button class="danger" onclick="confirmPost('/api/sitdown','Sit down the robot? Confirm it is in a safe test area.')">Sit Down</button>
   <button class="danger" onclick="confirmPost('/api/stop','Stop motor control service?')">Stop</button>
   <h2>HTTP Joystick Test</h2>
   <div class="pad">
@@ -309,6 +336,7 @@ async function refresh() {
   document.getElementById('service').textContent = data.service;
   document.getElementById('state').textContent = data.service_active;
   document.getElementById('standupReady').textContent = data.standup_ready;
+  document.getElementById('sitdownReady').textContent = data.sitdown_ready;
 }
 setInterval(refresh, 1000);
 refresh();
