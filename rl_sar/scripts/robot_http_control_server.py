@@ -311,57 +311,215 @@ class ControlHandler(BaseHTTPRequestHandler):
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>D1 Robot HTTP Control</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 28px; color: #17202a; }
-    main { max-width: 720px; }
-    .status { padding: 12px 14px; background: #eef5ff; border: 1px solid #b8d4ff; border-radius: 6px; margin: 16px 0; }
-    button {
-      font-size: 17px;
-      padding: 11px 16px;
+    :root {
+      color-scheme: dark;
+      --bg: #101316;
+      --panel: #191f24;
+      --panel2: #20272d;
+      --line: #33404a;
+      --text: #f4f7f8;
+      --muted: #a9b5bc;
+      --blue: #2f7df6;
+      --green: #18a058;
+      --red: #dc3f3f;
+      --amber: #d99a18;
+      --purple: #7a5cff;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 50% 0%, #1d2a31 0, var(--bg) 42%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      overscroll-behavior: none;
+    }
+    main {
+      width: min(100%, 520px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    h1 { margin: 0; font-size: 24px; line-height: 1.1; letter-spacing: 0; }
+    .subtitle { margin-top: 4px; color: var(--muted); font-size: 13px; }
+    .state-pill {
+      min-width: 88px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .state-pill b { display: block; color: var(--text); font-size: 15px; margin-top: 2px; }
+    .status {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px;
+      background: rgba(25, 31, 36, 0.92);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .metric {
+      min-height: 56px;
+      padding: 8px;
       border-radius: 6px;
+      background: var(--panel2);
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .metric b { display: block; color: var(--text); font-size: 14px; margin-top: 4px; }
+    .panel {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(25, 31, 36, 0.94);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.22);
+    }
+    .section-title {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+    button {
+      min-height: 48px;
+      border-radius: 8px;
       border: 0;
       cursor: pointer;
-      margin: 0 8px 10px 0;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
-    .primary { background: #2563eb; color: white; }
-    .standup { background: #128a3a; color: white; }
-    .danger { background: #b42318; color: white; }
-    .motion { background: #7c3aed; color: white; }
-    .pad button { min-width: 76px; background: #334155; color: white; }
-    .pad { user-select: none; -webkit-user-select: none; touch-action: none; }
-    pre { white-space: pre-wrap; background: #f6f8fa; padding: 12px; border-radius: 6px; }
+    button:active { transform: translateY(1px) scale(0.99); filter: brightness(1.08); }
+    .primary { background: linear-gradient(180deg, #3f8dff, var(--blue)); }
+    .standup { background: linear-gradient(180deg, #24bd70, var(--green)); }
+    .danger { background: linear-gradient(180deg, #ee5555, var(--red)); }
+    .motion { background: linear-gradient(180deg, #907bff, var(--purple)); }
+    .neutral { background: linear-gradient(180deg, #53616d, #39454f); }
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .remote {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      touch-action: none;
+    }
+    .dpad {
+      width: min(100%, 330px);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 76px);
+      gap: 10px;
+    }
+    .drive-btn {
+      background: linear-gradient(180deg, #52616d, #323c45);
+      border: 1px solid #64737e;
+      font-size: 16px;
+    }
+    .drive-btn.forward { grid-column: 2; grid-row: 1; }
+    .drive-btn.left { grid-column: 1; grid-row: 2; }
+    .drive-btn.stop { grid-column: 2; grid-row: 2; background: linear-gradient(180deg, #f0ab2d, var(--amber)); color: #18130a; }
+    .drive-btn.right { grid-column: 3; grid-row: 2; }
+    .drive-btn.back { grid-column: 2; grid-row: 3; }
+    .turn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .turn-row .drive-btn { min-height: 64px; }
+    .readout {
+      min-height: 62px;
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #0d1114;
+      color: #c7d0d6;
+      white-space: pre-wrap;
+      font-size: 12px;
+      overflow: auto;
+    }
+    @media (max-width: 420px) {
+      main { padding: 14px 12px 18px; gap: 12px; }
+      h1 { font-size: 21px; }
+      .status { grid-template-columns: repeat(2, 1fr); }
+      .actions { grid-template-columns: 1fr 1fr; }
+      .dpad { grid-template-rows: repeat(3, 68px); gap: 8px; }
+      button { min-height: 46px; font-size: 14px; }
+    }
   </style>
 </head>
 <body>
 <main>
-  <h1>D1 Robot HTTP Control</h1>
+  <div class="topbar">
+    <div>
+      <h1>D1 Robot</h1>
+      <div class="subtitle">HTTP Remote Control</div>
+    </div>
+    <div class="state-pill">Main<b id="state">-</b></div>
+  </div>
+
   <div class="status">
-    Service: <b id="service">-</b><br>
-    State: <b id="state">-</b><br>
-    Standup service: <b id="standupReady">-</b><br>
-    Sitdown service: <b id="sitdownReady">-</b><br>
-    Locomotion service: <b id="locomotionReady">-</b>
+    <div class="metric">Stand Up<b id="standupReady">-</b></div>
+    <div class="metric">Sit Down<b id="sitdownReady">-</b></div>
+    <div class="metric">Work Mode<b id="locomotionReady">-</b></div>
   </div>
-  <button class="primary" onclick="post('/api/start')">Start</button>
-  <button class="standup" onclick="confirmPost('/api/standup','Stand up the robot? Confirm it is in a safe test area.')">Stand Up</button>
-  <button class="motion" onclick="confirmPost('/api/locomotion','Enter work mode? Confirm the robot is standing and clear to move.')">Work Mode</button>
-  <button class="danger" onclick="confirmPost('/api/sitdown','Sit down the robot? Confirm it is in a safe test area.')">Sit Down</button>
-  <button class="danger" onclick="confirmPost('/api/stop','Stop motor control service?')">Stop</button>
-  <h2>HTTP Joystick Test</h2>
-  <div class="pad">
-    <button oncontextmenu="return false" onpointerdown="hold(event,0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Forward</button>
-    <button oncontextmenu="return false" onpointerdown="hold(event,-0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Back</button>
-    <button oncontextmenu="return false" onpointerdown="hold(event,0,0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Left</button>
-    <button oncontextmenu="return false" onpointerdown="hold(event,0,-0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Right</button>
-    <button oncontextmenu="return false" onpointerdown="hold(event,0,0,0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw L</button>
-    <button oncontextmenu="return false" onpointerdown="hold(event,0,0,-0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw R</button>
-    <button onclick="zero()">Zero</button>
-  </div>
-  <pre id="log"></pre>
+
+  <section class="panel">
+    <p class="section-title">Robot State</p>
+    <div class="actions">
+      <button class="primary" onclick="post('/api/start')">Start</button>
+      <button class="danger" onclick="confirmPost('/api/stop','Stop motor control service?')">Stop</button>
+      <button class="standup" onclick="confirmPost('/api/standup','Stand up the robot? Confirm it is in a safe test area.')">Stand Up</button>
+      <button class="danger" onclick="confirmPost('/api/sitdown','Sit down the robot? Confirm it is in a safe test area.')">Sit Down</button>
+      <button class="motion" onclick="confirmPost('/api/locomotion','Enter work mode? Confirm the robot is standing and clear to move.')">Work Mode</button>
+      <button class="neutral" onclick="zero()">Zero</button>
+    </div>
+  </section>
+
+  <section class="panel remote">
+    <p class="section-title">Drive</p>
+    <div class="dpad">
+      <button class="drive-btn forward" oncontextmenu="return false" onpointerdown="hold(event,0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">FWD</button>
+      <button class="drive-btn left" oncontextmenu="return false" onpointerdown="hold(event,0,0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">LEFT</button>
+      <button class="drive-btn stop" onclick="zero()">STOP</button>
+      <button class="drive-btn right" oncontextmenu="return false" onpointerdown="hold(event,0,-0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">RIGHT</button>
+      <button class="drive-btn back" oncontextmenu="return false" onpointerdown="hold(event,-0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">BACK</button>
+    </div>
+    <div class="turn-row">
+      <button class="drive-btn" oncontextmenu="return false" onpointerdown="hold(event,0,0,0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">TURN L</button>
+      <button class="drive-btn" oncontextmenu="return false" onpointerdown="hold(event,0,0,-0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">TURN R</button>
+    </div>
+  </section>
+
+  <pre class="readout" id="log"></pre>
 </main>
 <script>
 async function post(path, body) {
@@ -395,7 +553,6 @@ function release(event) {
 async function refresh() {
   const res = await fetch('/api/status');
   const data = await res.json();
-  document.getElementById('service').textContent = data.service;
   document.getElementById('state').textContent = data.service_active;
   document.getElementById('standupReady').textContent = data.standup_ready;
   document.getElementById('sitdownReady').textContent = data.sitdown_ready;
