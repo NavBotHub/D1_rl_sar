@@ -121,7 +121,7 @@ class RobotHttpController:
         return proc.stdout.strip()
 
     def standup_ready(self):
-        return self.standup_client.service_is_ready()
+        return self.standup_client.wait_for_service(timeout_sec=0.0)
 
     def wait_for_standup(self, timeout):
         return self.standup_client.wait_for_service(timeout_sec=timeout)
