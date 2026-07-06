@@ -36,6 +36,7 @@
 #include <geometry_msgs/msg/twist.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_srvs/srv/trigger.hpp>
 #endif
 
 #include "matplotlibcpp.h"
@@ -195,7 +196,11 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
     sensor_msgs::msg::JointState joint_state_msg_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscriber;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr standup_service_;
     void CmdvelCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
+    void StandupServiceCallback(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 #endif
 };
 

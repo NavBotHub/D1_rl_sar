@@ -454,6 +454,7 @@ if(SYSTEM_TYPE STREQUAL "Linux" AND NOT USE_CMAKE)
         ament_target_dependencies(rl_real_d1
             rclcpp
             geometry_msgs
+            std_srvs
             dmbot_serial
             sensor_msgs
         )

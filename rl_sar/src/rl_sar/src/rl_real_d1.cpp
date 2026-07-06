@@ -42,6 +42,9 @@ RL_Real::RL_Real(int argc, char **argv)
         std::bind(&RL_Real::OdomCallBack, this, std::placeholders::_1));
     joint_state_pub_ = ros2_node->create_publisher<sensor_msgs::msg::JointState>(
         "/joint_states", 10);
+    standup_service_ = ros2_node->create_service<std_srvs::srv::Trigger>(
+        "/rl_sar/standup",
+        std::bind(&RL_Real::StandupServiceCallback, this, std::placeholders::_1, std::placeholders::_2));
     dog_usb_enable = ros2_node->declare_parameter<bool>("dog_usb_enable", false);
     dog_usb_device = ros2_node->declare_parameter<std::string>("dog_usb_device", "");
     dog_usb_baud = ros2_node->declare_parameter<int>("dog_usb_baud", 115200);
@@ -933,6 +936,18 @@ void RL_Real::CmdvelCallback(
 {
     this->cmd_vel = *msg;
 }
+
+#if defined(USE_ROS2)
+void RL_Real::StandupServiceCallback(
+    const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+    std::shared_ptr<std_srvs::srv::Trigger::Response> response)
+{
+    (void)request;
+    this->control.SetGamepad(Input::Gamepad::A);
+    response->success = true;
+    response->message = "standup command queued";
+}
+#endif
 #endif
 
 #if defined(USE_ROS1)
