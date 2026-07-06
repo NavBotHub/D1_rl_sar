@@ -469,7 +469,7 @@ class ControlHandler(BaseHTTPRequestHandler):
     @supports (min-height: 100dvh) {
       main { min-height: 100dvh; }
     }
-    @media (max-width: 420px) {
+    @media (max-width: 560px) {
       main { padding: 10px 12px 12px; gap: 8px; }
       h1 { font-size: 21px; }
       .subtitle { font-size: 12px; }
@@ -489,7 +489,7 @@ class ControlHandler(BaseHTTPRequestHandler):
       .drive-btn { font-size: 14px; }
       .readout { display: none; }
     }
-    @media (max-width: 420px) and (max-height: 760px) {
+    @media (max-width: 560px) and (max-height: 900px) {
       main { padding-top: 8px; gap: 7px; }
       .topbar { gap: 8px; }
       h1 { font-size: 20px; }
@@ -499,6 +499,16 @@ class ControlHandler(BaseHTTPRequestHandler):
       .dpad { grid-template-rows: repeat(3, 56px); gap: 7px; }
       .turn-row .drive-btn { min-height: 50px; }
       button { min-height: 40px; }
+    }
+    @media (max-width: 560px) and (max-height: 740px) {
+      main { gap: 6px; }
+      .subtitle { display: none; }
+      .section-title { display: none; }
+      .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .panel { padding: 8px; }
+      .dpad { grid-template-rows: repeat(3, 50px); gap: 6px; }
+      .turn-row .drive-btn { min-height: 46px; }
+      button { min-height: 38px; font-size: 12px; }
     }
   </style>
 </head>
