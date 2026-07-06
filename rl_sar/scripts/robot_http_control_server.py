@@ -314,13 +314,25 @@ class ControlHandler(BaseHTTPRequestHandler):
     body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin: 28px; color: #17202a; }
     main { max-width: 720px; }
     .status { padding: 12px 14px; background: #eef5ff; border: 1px solid #b8d4ff; border-radius: 6px; margin: 16px 0; }
-    button { font-size: 17px; padding: 11px 16px; border-radius: 6px; border: 0; cursor: pointer; margin: 0 8px 10px 0; }
+    button {
+      font-size: 17px;
+      padding: 11px 16px;
+      border-radius: 6px;
+      border: 0;
+      cursor: pointer;
+      margin: 0 8px 10px 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
     .primary { background: #2563eb; color: white; }
     .standup { background: #128a3a; color: white; }
     .danger { background: #b42318; color: white; }
     .motion { background: #7c3aed; color: white; }
     .pad button { min-width: 76px; background: #334155; color: white; }
-    .pad { user-select: none; touch-action: none; }
+    .pad { user-select: none; -webkit-user-select: none; touch-action: none; }
     pre { white-space: pre-wrap; background: #f6f8fa; padding: 12px; border-radius: 6px; }
   </style>
 </head>
@@ -341,12 +353,12 @@ class ControlHandler(BaseHTTPRequestHandler):
   <button class="danger" onclick="confirmPost('/api/stop','Stop motor control service?')">Stop</button>
   <h2>HTTP Joystick Test</h2>
   <div class="pad">
-    <button onpointerdown="hold(event,0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Forward</button>
-    <button onpointerdown="hold(event,-0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Back</button>
-    <button onpointerdown="hold(event,0,0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Left</button>
-    <button onpointerdown="hold(event,0,-0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Right</button>
-    <button onpointerdown="hold(event,0,0,0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw L</button>
-    <button onpointerdown="hold(event,0,0,-0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw R</button>
+    <button oncontextmenu="return false" onpointerdown="hold(event,0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Forward</button>
+    <button oncontextmenu="return false" onpointerdown="hold(event,-0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Back</button>
+    <button oncontextmenu="return false" onpointerdown="hold(event,0,0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Left</button>
+    <button oncontextmenu="return false" onpointerdown="hold(event,0,-0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Right</button>
+    <button oncontextmenu="return false" onpointerdown="hold(event,0,0,0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw L</button>
+    <button oncontextmenu="return false" onpointerdown="hold(event,0,0,-0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw R</button>
     <button onclick="zero()">Zero</button>
   </div>
   <pre id="log"></pre>
@@ -363,12 +375,14 @@ function drive(x, y, yaw) { post('/api/cmd_vel', {x, y, yaw}); }
 function zero() { post('/api/cmd_vel/zero'); }
 let driveTimer = null;
 function hold(event, x, y, yaw) {
+  event.preventDefault();
   event.currentTarget.setPointerCapture(event.pointerId);
   drive(x, y, yaw);
   if (driveTimer) clearInterval(driveTimer);
   driveTimer = setInterval(() => drive(x, y, yaw), 150);
 }
 function release(event) {
+  event.preventDefault();
   if (driveTimer) {
     clearInterval(driveTimer);
     driveTimer = null;
