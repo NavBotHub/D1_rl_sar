@@ -198,11 +198,15 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscriber;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr standup_service_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr sitdown_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr locomotion_service_;
     void CmdvelCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
     void StandupServiceCallback(
         const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
         std::shared_ptr<std_srvs::srv::Trigger::Response> response);
     void SitdownServiceCallback(
+        const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response);
+    void LocomotionServiceCallback(
         const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
         std::shared_ptr<std_srvs::srv::Trigger::Response> response);
 #endif

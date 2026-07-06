@@ -14,6 +14,7 @@ Endpoints:
   POST /api/stop
   POST /api/standup
   POST /api/sitdown
+  POST /api/locomotion
   POST /api/cmd_vel       {"x": 0.2, "y": 0.0, "yaw": 0.1}
   POST /api/cmd_vel/zero
 """
@@ -50,6 +51,7 @@ class RobotHttpController:
         self.cmd_vel_pub = self.node.create_publisher(Twist, "/cmd_vel", 10)
         self.standup_client = self.node.create_client(Trigger, "/rl_sar/standup")
         self.sitdown_client = self.node.create_client(Trigger, "/rl_sar/sitdown")
+        self.locomotion_client = self.node.create_client(Trigger, "/rl_sar/locomotion")
 
         self.executor = SingleThreadedExecutor()
         self.executor.add_node(self.node)
@@ -128,11 +130,17 @@ class RobotHttpController:
     def sitdown_ready(self):
         return self.sitdown_client.wait_for_service(timeout_sec=0.0)
 
+    def locomotion_ready(self):
+        return self.locomotion_client.wait_for_service(timeout_sec=0.0)
+
     def wait_for_standup(self, timeout):
         return self.standup_client.wait_for_service(timeout_sec=timeout)
 
     def wait_for_sitdown(self, timeout):
         return self.sitdown_client.wait_for_service(timeout_sec=timeout)
+
+    def wait_for_locomotion(self, timeout):
+        return self.locomotion_client.wait_for_service(timeout_sec=timeout)
 
     def call_standup(self):
         if not self.wait_for_standup(self.args.service_timeout):
@@ -157,6 +165,18 @@ class RobotHttpController:
                 return {"ok": bool(response.success), "message": response.message}
             time.sleep(0.05)
         return {"ok": False, "message": "/rl_sar/sitdown call timed out"}
+
+    def call_locomotion(self):
+        if not self.wait_for_locomotion(self.args.service_timeout):
+            return {"ok": False, "message": "/rl_sar/locomotion service not ready"}
+        future = self.locomotion_client.call_async(Trigger.Request())
+        deadline = time.monotonic() + self.args.service_timeout
+        while time.monotonic() < deadline:
+            if future.done():
+                response = future.result()
+                return {"ok": bool(response.success), "message": response.message}
+            time.sleep(0.05)
+        return {"ok": False, "message": "/rl_sar/locomotion call timed out"}
 
     def publish_cmd_vel(self, x, y, yaw, update_watchdog=True):
         x = clamp(x, -self.args.max_x, self.args.max_x)
@@ -186,6 +206,7 @@ class RobotHttpController:
             "service_enabled": self.service_enabled(),
             "standup_ready": self.standup_ready(),
             "sitdown_ready": self.sitdown_ready(),
+            "locomotion_ready": self.locomotion_ready(),
             "last_cmd": last_cmd,
             "last_cmd_age_ms": age,
             "limits": {
@@ -239,6 +260,12 @@ class ControlHandler(BaseHTTPRequestHandler):
             sitdown = self.controller.call_sitdown()
             self.send_json(200 if sitdown["ok"] else 500, {"ok": sitdown["ok"], "sitdown": sitdown, "status": self.controller.status()})
             return
+        if self.path == "/api/locomotion":
+            start = self.controller.run_systemctl("start")
+            locomotion = self.controller.call_locomotion() if start["ok"] else {"ok": False, "message": "failed to start service"}
+            ok = start["ok"] and locomotion["ok"]
+            self.send_json(200 if ok else 500, {"ok": ok, "start": start, "locomotion": locomotion, "status": self.controller.status()})
+            return
         if self.path == "/api/cmd_vel":
             payload = self.read_json()
             result = self.controller.publish_cmd_vel(
@@ -291,7 +318,9 @@ class ControlHandler(BaseHTTPRequestHandler):
     .primary { background: #2563eb; color: white; }
     .standup { background: #128a3a; color: white; }
     .danger { background: #b42318; color: white; }
+    .motion { background: #7c3aed; color: white; }
     .pad button { min-width: 76px; background: #334155; color: white; }
+    .pad { user-select: none; touch-action: none; }
     pre { white-space: pre-wrap; background: #f6f8fa; padding: 12px; border-radius: 6px; }
   </style>
 </head>
@@ -302,20 +331,22 @@ class ControlHandler(BaseHTTPRequestHandler):
     Service: <b id="service">-</b><br>
     State: <b id="state">-</b><br>
     Standup service: <b id="standupReady">-</b><br>
-    Sitdown service: <b id="sitdownReady">-</b>
+    Sitdown service: <b id="sitdownReady">-</b><br>
+    Locomotion service: <b id="locomotionReady">-</b>
   </div>
   <button class="primary" onclick="post('/api/start')">Start</button>
   <button class="standup" onclick="confirmPost('/api/standup','Stand up the robot? Confirm it is in a safe test area.')">Stand Up</button>
+  <button class="motion" onclick="confirmPost('/api/locomotion','Enter work mode? Confirm the robot is standing and clear to move.')">Work Mode</button>
   <button class="danger" onclick="confirmPost('/api/sitdown','Sit down the robot? Confirm it is in a safe test area.')">Sit Down</button>
   <button class="danger" onclick="confirmPost('/api/stop','Stop motor control service?')">Stop</button>
   <h2>HTTP Joystick Test</h2>
   <div class="pad">
-    <button onpointerdown="drive(0.2,0,0)" onpointerup="zero()">Forward</button>
-    <button onpointerdown="drive(-0.2,0,0)" onpointerup="zero()">Back</button>
-    <button onpointerdown="drive(0,0.15,0)" onpointerup="zero()">Left</button>
-    <button onpointerdown="drive(0,-0.15,0)" onpointerup="zero()">Right</button>
-    <button onpointerdown="drive(0,0,0.3)" onpointerup="zero()">Yaw L</button>
-    <button onpointerdown="drive(0,0,-0.3)" onpointerup="zero()">Yaw R</button>
+    <button onpointerdown="hold(event,0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Forward</button>
+    <button onpointerdown="hold(event,-0.2,0,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Back</button>
+    <button onpointerdown="hold(event,0,0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Left</button>
+    <button onpointerdown="hold(event,0,-0.15,0)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Right</button>
+    <button onpointerdown="hold(event,0,0,0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw L</button>
+    <button onpointerdown="hold(event,0,0,-0.3)" onpointerup="release(event)" onpointercancel="release(event)" onpointerleave="release(event)">Yaw R</button>
     <button onclick="zero()">Zero</button>
   </div>
   <pre id="log"></pre>
@@ -330,6 +361,23 @@ async function post(path, body) {
 function confirmPost(path, message) { if (confirm(message)) post(path); }
 function drive(x, y, yaw) { post('/api/cmd_vel', {x, y, yaw}); }
 function zero() { post('/api/cmd_vel/zero'); }
+let driveTimer = null;
+function hold(event, x, y, yaw) {
+  event.currentTarget.setPointerCapture(event.pointerId);
+  drive(x, y, yaw);
+  if (driveTimer) clearInterval(driveTimer);
+  driveTimer = setInterval(() => drive(x, y, yaw), 150);
+}
+function release(event) {
+  if (driveTimer) {
+    clearInterval(driveTimer);
+    driveTimer = null;
+  }
+  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+  zero();
+}
 async function refresh() {
   const res = await fetch('/api/status');
   const data = await res.json();
@@ -337,6 +385,7 @@ async function refresh() {
   document.getElementById('state').textContent = data.service_active;
   document.getElementById('standupReady').textContent = data.standup_ready;
   document.getElementById('sitdownReady').textContent = data.sitdown_ready;
+  document.getElementById('locomotionReady').textContent = data.locomotion_ready;
 }
 setInterval(refresh, 1000);
 refresh();
