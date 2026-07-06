@@ -20,8 +20,11 @@ Endpoints:
 """
 
 import argparse
+import base64
+import hashlib
 import json
 import os
+import struct
 import subprocess
 import sys
 import threading
@@ -217,6 +220,46 @@ class RobotHttpController:
             },
         }
 
+    def handle_command(self, command):
+        command_type = command.get("type")
+        request_id = command.get("id")
+
+        if command_type == "status":
+            result = self.status()
+        elif command_type == "start":
+            systemctl = self.run_systemctl("start")
+            result = {"ok": systemctl["ok"], "systemctl": systemctl, "status": self.status()}
+        elif command_type == "stop":
+            zero = self.publish_cmd_vel(0.0, 0.0, 0.0, update_watchdog=False)
+            systemctl = self.run_systemctl("stop")
+            result = {"ok": systemctl["ok"], "zero": zero, "systemctl": systemctl, "status": self.status()}
+        elif command_type == "standup":
+            start = self.run_systemctl("start")
+            standup = self.call_standup() if start["ok"] else {"ok": False, "message": "failed to start service"}
+            result = {"ok": start["ok"] and standup["ok"], "start": start, "standup": standup, "status": self.status()}
+        elif command_type == "sitdown":
+            sitdown = self.call_sitdown()
+            result = {"ok": sitdown["ok"], "sitdown": sitdown, "status": self.status()}
+        elif command_type == "locomotion":
+            start = self.run_systemctl("start")
+            locomotion = self.call_locomotion() if start["ok"] else {"ok": False, "message": "failed to start service"}
+            result = {"ok": start["ok"] and locomotion["ok"], "start": start, "locomotion": locomotion, "status": self.status()}
+        elif command_type == "cmd_vel":
+            result = self.publish_cmd_vel(
+                command.get("x", 0.0),
+                command.get("y", 0.0),
+                command.get("yaw", 0.0),
+            )
+        elif command_type == "cmd_vel_zero":
+            result = self.publish_cmd_vel(0.0, 0.0, 0.0)
+        else:
+            result = {"ok": False, "error": "unknown command type", "type": command_type}
+
+        result["type"] = command_type
+        if request_id is not None:
+            result["id"] = request_id
+        return result
+
 
 class ControlHandler(BaseHTTPRequestHandler):
     controller = None
@@ -232,6 +275,9 @@ class ControlHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        if self.path == "/ws":
+            self.handle_websocket()
+            return
         if self.path == "/" or self.path == "/index.html":
             self.send_text(self.page(), "text/html; charset=utf-8")
             return
@@ -242,44 +288,116 @@ class ControlHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/api/start":
-            result = self.controller.run_systemctl("start")
-            self.send_json(200 if result["ok"] else 500, {"ok": result["ok"], "systemctl": result, "status": self.controller.status()})
+            result = self.controller.handle_command({"type": "start"})
+            self.send_json(200 if result["ok"] else 500, result)
             return
         if self.path == "/api/stop":
-            zero = self.controller.publish_cmd_vel(0.0, 0.0, 0.0, update_watchdog=False)
-            result = self.controller.run_systemctl("stop")
-            self.send_json(200 if result["ok"] else 500, {"ok": result["ok"], "zero": zero, "systemctl": result, "status": self.controller.status()})
+            result = self.controller.handle_command({"type": "stop"})
+            self.send_json(200 if result["ok"] else 500, result)
             return
         if self.path == "/api/standup":
-            start = self.controller.run_systemctl("start")
-            standup = self.controller.call_standup() if start["ok"] else {"ok": False, "message": "failed to start service"}
-            ok = start["ok"] and standup["ok"]
-            self.send_json(200 if ok else 500, {"ok": ok, "start": start, "standup": standup, "status": self.controller.status()})
+            result = self.controller.handle_command({"type": "standup"})
+            self.send_json(200 if result["ok"] else 500, result)
             return
         if self.path == "/api/sitdown":
-            sitdown = self.controller.call_sitdown()
-            self.send_json(200 if sitdown["ok"] else 500, {"ok": sitdown["ok"], "sitdown": sitdown, "status": self.controller.status()})
+            result = self.controller.handle_command({"type": "sitdown"})
+            self.send_json(200 if result["ok"] else 500, result)
             return
         if self.path == "/api/locomotion":
-            start = self.controller.run_systemctl("start")
-            locomotion = self.controller.call_locomotion() if start["ok"] else {"ok": False, "message": "failed to start service"}
-            ok = start["ok"] and locomotion["ok"]
-            self.send_json(200 if ok else 500, {"ok": ok, "start": start, "locomotion": locomotion, "status": self.controller.status()})
+            result = self.controller.handle_command({"type": "locomotion"})
+            self.send_json(200 if result["ok"] else 500, result)
             return
         if self.path == "/api/cmd_vel":
             payload = self.read_json()
-            result = self.controller.publish_cmd_vel(
-                payload.get("x", 0.0),
-                payload.get("y", 0.0),
-                payload.get("yaw", 0.0),
-            )
+            payload["type"] = "cmd_vel"
+            result = self.controller.handle_command(payload)
             self.send_json(200, result)
             return
         if self.path == "/api/cmd_vel/zero":
-            result = self.controller.publish_cmd_vel(0.0, 0.0, 0.0)
+            result = self.controller.handle_command({"type": "cmd_vel_zero"})
             self.send_json(200, result)
             return
         self.send_json(404, {"ok": False, "error": "not found"})
+
+    def handle_websocket(self):
+        if self.headers.get("Upgrade", "").lower() != "websocket":
+            self.send_json(400, {"ok": False, "error": "websocket upgrade required"})
+            return
+
+        key = self.headers.get("Sec-WebSocket-Key")
+        if not key:
+            self.send_json(400, {"ok": False, "error": "missing Sec-WebSocket-Key"})
+            return
+
+        accept = base64.b64encode(
+            hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode("ascii")).digest()
+        ).decode("ascii")
+
+        self.send_response(101, "Switching Protocols")
+        self.send_header("Upgrade", "websocket")
+        self.send_header("Connection", "Upgrade")
+        self.send_header("Sec-WebSocket-Accept", accept)
+        self.end_headers()
+
+        self.send_websocket_json({"ok": True, "type": "hello", "status": self.controller.status()})
+        while True:
+            message = self.read_websocket_message()
+            if message is None:
+                break
+            if message == "":
+                continue
+            try:
+                command = json.loads(message)
+                result = self.controller.handle_command(command)
+            except Exception as exc:
+                result = {"ok": False, "error": str(exc)}
+            self.send_websocket_json(result)
+
+    def read_websocket_message(self):
+        header = self.rfile.read(2)
+        if len(header) < 2:
+            return None
+
+        first, second = header
+        opcode = first & 0x0F
+        masked = bool(second & 0x80)
+        length = second & 0x7F
+
+        if opcode == 0x8:
+            return None
+        if opcode == 0x9:
+            self.send_websocket_frame(b"", opcode=0xA)
+            return ""
+        if opcode != 0x1:
+            return ""
+
+        if length == 126:
+            length = struct.unpack("!H", self.rfile.read(2))[0]
+        elif length == 127:
+            length = struct.unpack("!Q", self.rfile.read(8))[0]
+
+        mask_key = self.rfile.read(4) if masked else b""
+        payload = self.rfile.read(length)
+        if masked:
+            payload = bytes(byte ^ mask_key[index % 4] for index, byte in enumerate(payload))
+        return payload.decode("utf-8")
+
+    def send_websocket_json(self, payload):
+        self.send_websocket_frame(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+
+    def send_websocket_frame(self, payload, opcode=0x1):
+        header = bytearray([0x80 | opcode])
+        length = len(payload)
+        if length < 126:
+            header.append(length)
+        elif length <= 0xFFFF:
+            header.extend([126])
+            header.extend(struct.pack("!H", length))
+        else:
+            header.extend([127])
+            header.extend(struct.pack("!Q", length))
+        self.wfile.write(bytes(header) + payload)
+        self.wfile.flush()
 
     def read_json(self):
         length = int(self.headers.get("Content-Length", "0"))
@@ -558,16 +676,62 @@ class ControlHandler(BaseHTTPRequestHandler):
   <pre class="readout" id="log"></pre>
 </main>
 <script>
+let ws = null;
+let requestId = 1;
+let driveTimer = null;
+
+function commandFromHttp(path, body) {
+  if (path === '/api/start') return {type:'start'};
+  if (path === '/api/stop') return {type:'stop'};
+  if (path === '/api/standup') return {type:'standup'};
+  if (path === '/api/sitdown') return {type:'sitdown'};
+  if (path === '/api/locomotion') return {type:'locomotion'};
+  if (path === '/api/cmd_vel') return {type:'cmd_vel', x:body.x || 0, y:body.y || 0, yaw:body.yaw || 0};
+  if (path === '/api/cmd_vel/zero') return {type:'cmd_vel_zero'};
+  return {type:'status'};
+}
+
+function applyStatus(data) {
+  const status = data.status || data;
+  if (!status || !status.ok) return;
+  document.getElementById('state').textContent = status.service_active;
+  document.getElementById('standupReady').textContent = status.standup_ready;
+  document.getElementById('sitdownReady').textContent = status.sitdown_ready;
+  document.getElementById('locomotionReady').textContent = status.locomotion_ready;
+}
+
+function connectWebSocket() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    document.getElementById('log').textContent = JSON.stringify(data);
+    applyStatus(data);
+  };
+  ws.onclose = () => setTimeout(connectWebSocket, 1000);
+  ws.onerror = () => ws.close();
+}
+
+function sendCommand(command) {
+  command.id = requestId++;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(command));
+    return true;
+  }
+  return false;
+}
+
 async function post(path, body) {
+  const command = commandFromHttp(path, body || {});
+  if (sendCommand(command)) return;
   const res = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : '{}'});
   const text = await res.text();
   document.getElementById('log').textContent = text;
-  refresh();
+  try { applyStatus(JSON.parse(text)); } catch (_) {}
 }
 function confirmPost(path, message) { if (confirm(message)) post(path); }
 function drive(x, y, yaw) { post('/api/cmd_vel', {x, y, yaw}); }
 function zero() { post('/api/cmd_vel/zero'); }
-let driveTimer = null;
 function hold(event, x, y, yaw) {
   event.preventDefault();
   event.currentTarget.setPointerCapture(event.pointerId);
@@ -587,14 +751,13 @@ function release(event) {
   zero();
 }
 async function refresh() {
+  if (sendCommand({type:'status'})) return;
   const res = await fetch('/api/status');
   const data = await res.json();
-  document.getElementById('state').textContent = data.service_active;
-  document.getElementById('standupReady').textContent = data.standup_ready;
-  document.getElementById('sitdownReady').textContent = data.sitdown_ready;
-  document.getElementById('locomotionReady').textContent = data.locomotion_ready;
+  applyStatus(data);
 }
 setInterval(refresh, 1000);
+connectWebSocket();
 refresh();
 </script>
 </body>
