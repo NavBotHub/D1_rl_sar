@@ -1,0 +1,80 @@
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# --- CMake / build artifacts (generic) ---
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+# CMake-generated Makefiles are covered by ignored build directories.
+compile_commands.json
+*.cmake.user
+
+# --- Catkin (ROS1) ---
+devel/
+logs/
+.catkin_tools/
+
+# --- Colcon (ROS2) ---
+install/
+/log/
+/rl_sar/log/
+/rl_sar/ros2 _serial/log/
+
+# --- Project specific common outputs ---
+rl_sar/cmake_build/
+rl_sar/**/cmake_build/
+
+# Some submodules/examples may generate their own build dirs
+**/cmake_build/
+**/bazel-*
+**/bazel-bin/
+**/bazel-out/
+**/bazel-testlogs/
+
+# --- Runtime logs / dumps ---
+*.log
+*.tmp
+*.bak
+*.bak_*
+*.orig
+*.core
+/core
+core.[0-9]*
+
+# --- Large/generated simulation data ---
+*.csv
+*.CSV
+MUJOCO_LOG.TXT
+rl_sar/mujoco_*.txt
+rl_sar/*_probe.py
+
+# --- Third-party libraries (very large binaries) ---
+# Keep these out of git; download/install separately if needed.
+rl_sar/library/

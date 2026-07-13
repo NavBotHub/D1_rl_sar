@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+
+<launch>
+
+    <node name="test_motor" pkg="dmbot_serial" type="test_motor" output="screen"></node>
+
+</launch>

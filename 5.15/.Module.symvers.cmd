@@ -1,0 +1,1 @@
+cmd_/home/navbot/project/dmgo_rl_sar/5.15/Module.symvers := sed 's/\.ko$$/\.o/' /home/navbot/project/dmgo_rl_sar/5.15/modules.order | scripts/mod/modpost -m   -o /home/navbot/project/dmgo_rl_sar/5.15/Module.symvers -e -i Module.symvers   -T -

@@ -1,0 +1,1 @@
+ACTION=="add|change", SUBSYSTEM=="net", DRIVERS=="gs_usb", TAG+="systemd", ENV{SYSTEMD_WANTS}+="d1-canfd@$name.service"
