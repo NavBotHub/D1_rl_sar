@@ -6,44 +6,49 @@
 ![ROS 2](https://img.shields.io/badge/ROS%202-Humble-22314E?logo=ros&logoColor=white)
 ![CANFD](https://img.shields.io/badge/CANFD-gs__usb%201M%2F5M-0078D4)
 ![MuJoCo](https://img.shields.io/badge/MuJoCo-3.2.7-f06c2f)
-[![License](https://img.shields.io/badge/license-GPL--3.0-yellow)](https://github.com/NavBotHub/D1_rl_sar#)
 
 [English version](README.md)
 
 > 本文 D1 真机部署流程按 Jetson Orin Nano Super、JetPack 6.2.2、Ubuntu 22.04、ROS 2 Humble、达妙 USB-CANFD 验证。
 
-本文是 D1 真机部署手册，目标平台为 Jetson Orin Nano Super、JetPack 6.2.2、Ubuntu 22.04、ROS 2 Humble。通信方案使用达妙 `DM-USB2CANFD_Dual` 双路 USB-CAN FD，IMU 使用 `DM-IMU-L1`，腿部电机使用达妙 `DM6248P`。
+本文是 D1 真机部署手册，目标平台为 Jetson Orin Nano Super、JetPack 6.2.2、Ubuntu 22.04、ROS 2 Humble。通信方案使用达妙 `DM-USB2CANFD_Dual` 双路 USB-CAN FD，IMU 使用 `DM-IMU-L1`，腿部电机使用达妙 `DM6248P`。策略训练、checkpoint 验收和 ONNX 导出由 [D1 HIMLoco](https://gitee.com/lookc4/D1_himloco) 维护；本仓库从部署契约核对开始，继续完成 MuJoCo 和真机集成。
+
+> [!CAUTION]
+> 策略输出的关节目标会通过实时控制环发送到电机。必须先在 HIMLoco 和 MuJoCo 中验收 checkpoint；首次通电测试必须吊起机器人，保持急停和断电手段可立即操作，并在落地前核对关节顺序、方向、零位、IMU 方向、PD、CAN 映射和完整 ONNX 契约。
 
 ## 目录
 
-- [1. 适用范围与硬件要求](#1-适用范围与硬件要求)
+- [1. 适用范围与部署流程](#1-适用范围与部署流程)
 - [2. JetPack 6.2.2 系统烧录](#2-jetpack-622-系统烧录)
 - [3. 首次开机、网络与源配置](#3-首次开机网络与源配置)
 - [4. 仓库部署与编译](#4-仓库部署与编译)
 - [5. USB-CANFD 与 gs_usb 驱动](#5-usb-canfd-与-gs_usb-驱动)
 - [6. 实机电机参数与零点标定](#6-实机电机参数与零点标定)
 - [7. 真机运行与控制](#7-真机运行与控制)
-- [8. MuJoCo 可选仿真](#8-mujoco-可选仿真)
+- [8. 真机前 MuJoCo 验证](#8-真机前-mujoco-验证)
 - [9. 最短启动清单](#9-最短启动清单)
 - [10. 常见问题](#10-常见问题)
 - [参考资料](#参考资料)
 
-## 1. 适用范围与硬件要求
+## 1. 适用范围与部署流程
 
-### 当前验证状态
+### 仓库边界
 
-| 状态 | 内容 |
-|---|---|
-| 已验证 | ROS 2 Humble 可正常构建工作区 |
-| 已验证 | `d1_description` 已包含有效 ROS2 `package.xml` |
-| 已验证 | `rl_sar` 可生成真机入口 `rl_real_d1` 和 `rl_real_d1_trigger` |
-| 已验证 | `dm_imu_node` 可发布 `/imu/data` |
-| 已验证 | `DM-USB2CANFD_Dual` 刷为 SocketCAN 固件后可枚举为 `can1` / `can2` |
-| 已验证 | `5.15/gs_usb.ko` 可用于 Jetson 5.15 内核下的 CAN FD 通信 |
-| 已验证 | `d1-gs-usb.service`、`d1-canfd@.service` 和 udev 规则可自动加载驱动并配置 CAN FD |
-| 已验证 | `rl_real_d1` 可启动，FSM 可切换，ONNX 模型可加载 |
-| 仍需安全验证 | 接入真实电机后的完整 CAN 收发 |
-| 仍需安全验证 | 机器人吊起状态下的站立、下蹲、行走 |
+```text
+D1 HIMLoco 数据集与训练
+             ↓
+checkpoint 仿真验收与 ONNX 导出
+             ↓
+RL-SAR 部署契约核对
+             ↓
+MuJoCo 仿真与映射检查
+             ↓
+吊起状态站立 / 下蹲 / 小命令测试
+             ↓
+受控落地验收
+```
+
+编译成功或 ONNX 能加载都不代表真机已经安全可用。应把编译检查、CAN 回环、吊起测试和落地测试作为独立关卡，测试结果记录在 README 之外。
 
 ### 硬件和系统要求
 
@@ -231,7 +236,14 @@ sudo reboot
 ```bash
 mkdir -p ~/project
 cd ~/project
-git clone --recursive https://github.com/NavBotHub/D1_rl_sar
+git clone https://github.com/NavBotHub/D1_rl_sar.git
+cd ~/project/D1_rl_sar/rl_sar
+```
+
+如果 GitHub 访问不便，可使用 Gitee 镜像：
+
+```bash
+git clone https://gitee.com/lookc4/D1_rl_sar.git ~/project/D1_rl_sar
 cd ~/project/D1_rl_sar/rl_sar
 ```
 
@@ -343,7 +355,42 @@ cd ~/project/D1_rl_sar/rl_sar
 bash scripts/download_inference_runtime.sh onnx
 ```
 
-### 4.5 ROS2 编译
+### 4.5 核对 HIMLoco ONNX 部署契约
+
+部署文件位于：
+
+```text
+rl_sar/policy/d1/base.yaml
+rl_sar/policy/d1/robot_lab/config.yaml
+rl_sar/policy/d1/robot_lab/policy_onnx.onnx
+```
+
+当前策略契约如下：
+
+| 项目 | 必须一致的值或顺序 |
+|---|---|
+| 单帧观测 | 45：`commands(3) + ang_vel(3) + gravity_vec(3) + dof_pos(12) + dof_vel(12) + actions(12)` |
+| 观测历史 | `[0,1,2,3,4,5]`，time-priority，0 为最新帧 |
+| ONNX 输入 / 输出 | 270（45 × 6）/ 12 个关节动作 |
+| 控制周期 | `dt=0.005 s`、`decimation=4`，策略周期 0.02 s |
+| 关节顺序 | FL、FR、RL、RR；每条腿依次 hip、thigh、calf |
+| 默认姿态 | 左腿 `[-0.05,-0.75,-0.75]`；右腿 `[0.05,-0.75,-0.75]` |
+| RL Kp / Kd | 每条腿 `[50,55,55]` / `[3.2,3.5,3.5]` |
+| action scale | 每条腿 `[0.35,0.55,0.80]` |
+| torque limit | 每个关节 50 |
+
+替换模型前必须比较输入输出 shape、历史顺序、关节顺序、默认姿态、PD、action scale、torque 行为、控制周期、命令整形，以及导出与部署 ONNX 的 SHA256。模型必须先通过 HIMLoco checkpoint 验收和 RL-SAR MuJoCo 验证，才能进入通电测试。
+
+`commands_scale: [2.0, 2.0, 0.25]` 是观测归一化尺度，不是物理命令上限。当前纯轴部署范围是 `vx [-0.60,0.90] m/s`、`vy ±0.40 m/s`、`wz ±0.50 rad/s`，对应加速/减速限制分别为 `1.6/2.4`、`1.2/1.8`、`2.0/3.0`。对角和移动+yaw 命令还会额外投影。唯一事实来源是 `rl_sar/src/rl_sar/include/command_shaping.hpp`；dataset 支持更宽不代表可以扩大真机命令。
+
+交接时记录两个文件的哈希：
+
+```bash
+sha256sum <HIMLOCO_EXPORTED_POLICY>/policy_onnx.onnx
+sha256sum ~/project/D1_rl_sar/rl_sar/policy/d1/robot_lab/policy_onnx.onnx
+```
+
+### 4.6 ROS2 编译
 
 普通 ROS2 编译：
 
@@ -386,7 +433,7 @@ dm_imu dm_imu_node
 - `ros2 pkg executables dm_imu` 能看到 `dm_imu_node`。
 - `ldd ... | grep 'not found'` 没有输出表示动态库完整。
 
-### 4.6 配置 shell 自动 source
+### 4.7 配置 shell 自动 source
 
 编译成功后，可以把 ROS 和项目 setup 加入 `~/.bashrc`：
 
@@ -406,7 +453,7 @@ EOF
 source ~/.bashrc
 ```
 
-### 4.7 IMU 验证
+### 4.8 IMU 验证
 
 串口权限：
 
@@ -700,6 +747,8 @@ CAN ID 对应关系：
 
 ## 7. 真机运行与控制
 
+每次更换 ONNX 或部署参数后，都必须先完成第 8 节验证，再执行本节真机命令。首次通电仍必须吊起机器人并从小命令开始。
+
 ### 7.1 真机运行
 
 安全要求：首次运行必须吊起机器人，确认急停方式可用，再进入站立或行走状态。
@@ -878,9 +927,9 @@ journalctl -u rl-sar-trigger.service -u rl-sar-main.service -f
 - 如果 `L1 OFF` 没反应，优先确认 `dog_usb_l1_button_bit:=8`；如现场 BTN 位不一致，只改这个 bit。
 - 如果 `OFF` 后能退出电机控制但再次 `ON` 没反应，优先确认 `rl_real_d1_headless.launch.py` 已经包含 `OnProcessExit -> Shutdown`，并且已经重新运行 `install_rl_sar_services.sh`。
 
-## 8. MuJoCo 可选仿真
+## 8. 真机前 MuJoCo 验证
 
-MuJoCo 用于仿真或真机映射检查，不是实机最短部署链路的一部分。
+MuJoCo 是 HIMLoco checkpoint 验收和真机通电之间的部署关卡，用于在不驱动物理电机的情况下检查策略加载、关节顺序、默认姿态、命令方向、状态切换和真机映射。
 
 下载 MuJoCo：
 
@@ -915,6 +964,8 @@ cd ~/project/D1_rl_sar/rl_sar
 ./cmake_build/bin/rl_sim_mujoco d1 scene
 ```
 
+D1 description 还提供 `d1`、`scene_flat` 和 `scene_terrain` MJCF。第二个命令行参数是去掉 `.xml` 的文件名；不要使用 `rl_sar/src/rl_sar_zoo/d1_description/mjcf/` 中不存在的场景名。
+
 运行地形场景：
 
 ```bash
@@ -942,9 +993,19 @@ ros2 run rl_sar rl_real2mujoco d1 scene
 - 每个电机方向是否同向同幅度。
 - CAN ID 到 FL / FR / RL / RR 的关节顺序是否正确。
 
+新策略的验收顺序：
+
+1. 确认 ONNX 加载成功并保持 Passive。
+2. 进入 GetUp，检查到默认姿态的插值是否连续。
+3. 在零命令下进入 RL Locomotion。
+4. 依次测试小幅前后、横向和 yaw，再只测试 `command_shaping.hpp` 允许的组合命令。
+5. 完成 GetDown，并确认 FSM 返回 Passive。
+
+如果姿态突跳、关节方向相反、输出非有限、命令方向错误，或仿真 torque/action 行为与部署契约不一致，应停止交接。
+
 ## 9. 最短启动清单
 
-前提：已经安装 CANFD 自动加载，且工作区已经编译。
+前提：已经安装 CANFD 自动加载、工作区已经编译，并且当前 ONNX 已通过第 8 节验证。
 
 1. 上电前吊起机器人。
 2. 插好 IMU、USB-CANFD 和手柄。
@@ -965,8 +1026,8 @@ ros2 launch rl_sar rl_real_d1.launch.py
 ```
 
 5. 先按 `0` 进入 GetUp。
-6. 确认姿态稳定后再按 `1` 进入 RLLocomotion。
-7. 异常时按 `P` 或 `LB + X` 回 Passive，并断电检查。
+6. 确认吊起姿态稳定后再按 `1` 进入 RLLocomotion，并从零命令开始。
+7. 正常停机使用 `9` 或 `B` 完成 GetDown；异常时按 `P` 或 `LB + X` 回 Passive，再隔离电源并检查。
 
 ## 10. 常见问题
 
@@ -1047,5 +1108,9 @@ rm -rf cmake_build
 - NVIDIA SDK Manager Jetson Direct Flash: <https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson-direct-flash/index.html>
 - JetPack SDK 6.2.2: <https://developer.nvidia.com/embedded/jetpack-sdk-622>
 - usbipd-win WSL support: <https://github.com/dorssel/usbipd-win/wiki/WSL-support>
+- D1 HIMLoco 训练与 ONNX 导出：<https://gitee.com/lookc4/D1_himloco>
 - Upstream RL-SAR: <https://github.com/fan-ziqi/rl_sar>
-- Project repository: <https://github.com/NavBotHub/D1_rl_sar>
+- 项目仓库：<https://github.com/NavBotHub/D1_rl_sar>
+- 项目 Gitee 镜像：<https://gitee.com/lookc4/D1_rl_sar>
+- RL-SAR 框架许可证：[`rl_sar/LICENSE`](rl_sar/LICENSE)（Apache-2.0）
+- Jetson `gs_usb` 驱动源码：[`5.15/gs_usb.c`](5.15/gs_usb.c)（GPL-2.0-only）

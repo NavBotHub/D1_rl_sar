@@ -78,3 +78,14 @@ rl_sar/*_probe.py
 # --- Third-party libraries (very large binaries) ---
 # Keep these out of git; download/install separately if needed.
 rl_sar/library/
+
+# --- Local editor metadata ---
+.marscode/
+
+# --- Bundled gs_usb Linux Kbuild intermediates ---
+/5.15/.*.cmd
+/5.15/*.o
+/5.15/*.mod
+/5.15/*.mod.c
+/5.15/Module.symvers
+/5.15/modules.order

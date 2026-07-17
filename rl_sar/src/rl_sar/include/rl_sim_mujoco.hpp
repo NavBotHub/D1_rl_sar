@@ -136,6 +136,8 @@ private:
     bool dog_usb_last_remote_timeout = false;
     bool dog_usb_last_serial_connected = true;
     std::vector<float> smoothed_commands_{0.0f, 0.0f, 0.0f};
+    std::vector<float> raw_command_inputs_{0.0f, 0.0f, 0.0f};
+    std::string command_input_source_{"control"};
     bool command_smoothing_initialized_ = false;
     bool command_smoothing_reset_requested_ = true;
 

@@ -1,1 +1,0 @@
-cmd_/home/navbot/project/dmgo_rl_sar/5.15/gs_usb.mod := printf '%s\n'   gs_usb.o | awk '!x[$$0]++ { print("/home/navbot/project/dmgo_rl_sar/5.15/"$$0) }' > /home/navbot/project/dmgo_rl_sar/5.15/gs_usb.mod

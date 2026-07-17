@@ -1009,7 +1009,10 @@ void RL_Sim::UpdateCsvAutoRecord(double t)
         {16.0, 26.0, "back_0p5", -0.5f, 0.0f, 0.0f},
         {26.0, 36.0, "back_0p6", -0.6f, 0.0f, 0.0f},
         {36.0, 46.0, "back_0p6_repeat", -0.6f, 0.0f, 0.0f},
-        {46.0, 52.0, "stand_end", 0.0f, 0.0f, 0.0f},
+        {46.0, 50.0, "stand_mid", 0.0f, 0.0f, 0.0f},
+        {50.0, 60.0, "yaw_pos_0p5", 0.0f, 0.0f, 0.5f},
+        {60.0, 70.0, "yaw_neg_0p5", 0.0f, 0.0f, -0.5f},
+        {70.0, 76.0, "stand_end", 0.0f, 0.0f, 0.0f},
     };
 
     const Segment *active = &kSegments[0];
@@ -1095,6 +1098,7 @@ void RL_Sim::RobotControl()
                           << ",foot_vx_FL,foot_vy_FL,foot_vz_FL,foot_vx_FR,foot_vy_FR,foot_vz_FR,foot_vx_RL,foot_vy_RL,foot_vz_RL,foot_vx_RR,foot_vy_RR,foot_vz_RR"
                           << ",foot_speed_xy_FL,foot_speed_xy_FR,foot_speed_xy_RL,foot_speed_xy_RR"
                           << ",contact_FL,contact_FR,contact_RL,contact_RR"
+                          << ",contact_normal_force_FL,contact_normal_force_FR,contact_normal_force_RL,contact_normal_force_RR"
                           << ",target_foot_z_FL,target_foot_z_FR,target_foot_z_RL,target_foot_z_RR"
                           << ",target_swing_contact_FL,target_swing_contact_FR,target_swing_contact_RL,target_swing_contact_RR"
                           << ",contact_speed_xy_FL,contact_speed_xy_FR,contact_speed_xy_RL,contact_speed_xy_RR"
@@ -1119,6 +1123,7 @@ void RL_Sim::RobotControl()
         std::array<std::array<float, 3>, 4> foot_vel = {{{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}}};
         std::array<float, 4> foot_z = {0.f, 0.f, 0.f, 0.f};
         std::array<int, 4> contact = {0, 0, 0, 0};
+        std::array<float, 4> contact_normal_force = {0.f, 0.f, 0.f, 0.f};
         std::array<float, 4> target_foot_z = {0.f, 0.f, 0.f, 0.f};
         if (this->mj_data)
         {
@@ -1159,6 +1164,17 @@ void RL_Sim::RobotControl()
                     if (geom_id >= 0 && (g1 == geom_id || g2 == geom_id))
                     {
                         contact[leg] = 1;
+                        // MuJoCo returns contact-frame force/torque. Element 0
+                        // is the compressive normal-force magnitude. Sum all
+                        // contacts belonging to the same foot so the CSV can
+                        // distinguish a hard RL touchdown from a mere boolean
+                        // re-contact; this is an actual solver contact force,
+                        // unlike the AMP MPC planned-Fz proxy.
+                        mjtNum force_torque[6] = {0, 0, 0, 0, 0, 0};
+                        mj_contactForce(this->mj_model, this->mj_data, ci, force_torque);
+                        contact_normal_force[leg] += static_cast<float>(
+                            std::max<mjtNum>(mjtNum(0), force_torque[0])
+                        );
                     }
                 }
             }
@@ -1319,6 +1335,10 @@ void RL_Sim::RobotControl()
         for (int is_contact : contact)
         {
             this->csv_ofs << "," << is_contact;
+        }
+        for (float normal_force : contact_normal_force)
+        {
+            this->csv_ofs << "," << normal_force;
         }
         for (float z_pos : target_foot_z)
         {
@@ -1484,6 +1504,8 @@ void RL_Sim::GetSysJoystick()
         this->control.x = planar.x;
         this->control.y = planar.y;
         this->control.yaw = rl_command::ShapeYawCommand(rx);
+        this->raw_command_inputs_ = {ly, lx, rx};
+        this->command_input_source_ = "joystick_axes";
         this->sys_js_active = true;
     }
     else if (this->sys_js_active)
@@ -1492,6 +1514,7 @@ void RL_Sim::GetSysJoystick()
         this->control.y = 0.0f;
         this->control.yaw = 0.0f;
         this->sys_js_active = false;
+        this->raw_command_inputs_.assign(3, 0.0f);
     }
 }
 
@@ -1504,11 +1527,19 @@ void RL_Sim::RunModel()
         this->obs.ang_vel = this->robot_state.imu.gyroscope;
         this->ApplyDogUsbControl(false);
         std::vector<float> target_commands = {this->control.x, this->control.y, this->control.yaw};
+        std::vector<float> raw_trace = this->raw_command_inputs_;
+        std::string raw_units = "normalized_axis";
+        if (this->command_input_source_ == "control")
+        {
+            raw_trace = target_commands;
+            raw_units = "mps_radps";
+        }
         target_commands = rl_command::ClampCommands(target_commands);
         const float command_dt = std::max(
             this->params.Get<float>("dt") * static_cast<float>(this->params.Get<int>("decimation")),
             1.0e-4f);
         this->obs.commands = this->SmoothCommands(target_commands, command_dt);
+        rl_command::LogCommandTrace(this->command_input_source_, raw_units, raw_trace, target_commands, this->obs.commands);
         //not currently available for non-ros mujoco version
         // if (this->control.navigation_mode)
         // {

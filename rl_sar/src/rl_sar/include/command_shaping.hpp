@@ -8,14 +8,17 @@
 
 #include <algorithm>
 #include <cmath>
+#include <chrono>
+#include <iostream>
+#include <string>
 #include <vector>
 
 namespace rl_command
 {
 constexpr float kBackwardCommandLimit = -0.6f;
-constexpr float kForwardCommandLimit = 1.0f;
-constexpr float kLateralCommandLimit = 0.6f;
-constexpr float kYawCommandLimit = 1.2f;
+constexpr float kForwardCommandLimit = 0.9f;
+constexpr float kLateralCommandLimit = 0.4f;
+constexpr float kYawCommandLimit = 0.5f;
 constexpr float kYawStartCommand = 0.2f;
 constexpr float kYawInputDeadband = 0.02f;
 constexpr float kForwardDiagonalXLimit = 0.7f;
@@ -23,8 +26,11 @@ constexpr float kForwardDiagonalYLimit = 0.35f;
 constexpr float kBackwardDiagonalXLimit = 0.5f;
 constexpr float kBackwardDiagonalYLimit = 0.25f;
 constexpr float kDiagonalActivationThreshold = 0.05f;
-constexpr float kMixedYawLowForwardLimit = 0.5f;
-constexpr float kMixedYawLowForwardYawLimit = 0.9f;
+constexpr float kMixedYawForwardXLimit = 0.7f;
+constexpr float kMixedYawForwardYawLimit = 0.5f;
+constexpr float kMixedYawBackwardLowerXLimit = -0.6f;
+constexpr float kMixedYawBackwardUpperXLimit = -0.5f;
+constexpr float kMixedYawBackwardYawLimit = 0.4f;
 constexpr float kCommandAccelX = 1.6f;
 constexpr float kCommandDecelX = 2.4f;
 constexpr float kCommandAccelY = 1.2f;
@@ -63,11 +69,15 @@ inline PlanarCommand LimitPlanarDiagonal(PlanarCommand cmd)
     return cmd;
 }
 
-inline float MixedYawLimitForForward(float x)
+inline float MixedYawLimitForTranslation(float x)
 {
-    if (x <= kMixedYawLowForwardLimit)
+    if (x > kDiagonalActivationThreshold && x <= kMixedYawForwardXLimit)
     {
-        return kMixedYawLowForwardYawLimit;
+        return kMixedYawForwardYawLimit;
+    }
+    if (x >= kMixedYawBackwardLowerXLimit && x <= kMixedYawBackwardUpperXLimit)
+    {
+        return kMixedYawBackwardYawLimit;
     }
     return 0.0f;
 }
@@ -88,13 +98,13 @@ inline void LimitUnsupportedCommandMix(std::vector<float>& commands)
         return;
     }
 
-    if (has_y || commands[0] <= kDiagonalActivationThreshold)
+    if (has_y)
     {
         commands[2] = 0.0f;
         return;
     }
 
-    const float yaw_limit = MixedYawLimitForForward(commands[0]);
+    const float yaw_limit = MixedYawLimitForTranslation(commands[0]);
     commands[2] = ClampFloat(commands[2], -yaw_limit, yaw_limit);
 }
 
@@ -198,7 +208,38 @@ inline std::vector<float> SmoothCommands(const std::vector<float>& target_comman
     smoothed_commands[2] = SlewToward(
         smoothed_commands[2], target_commands[2], kCommandAccelYaw, kCommandDecelYaw, dt);
 
-    return smoothed_commands;
+    // A component-wise slew can temporarily enter an unsupported mixed region
+    // even when both endpoints are valid (for example diagonal -> pure forward,
+    // or forward+yaw -> higher forward). Project the final command back through
+    // the same deployment envelope and synchronize the smoother state so the
+    // next step cannot integrate from an unsafe intermediate value.
+    const std::vector<float> projected_commands = ClampCommands(smoothed_commands);
+    smoothed_commands.assign(projected_commands.begin(), projected_commands.begin() + 3);
+    return projected_commands;
+}
+
+inline void LogCommandTrace(const std::string& source,
+                            const std::string& raw_units,
+                            const std::vector<float>& raw,
+                            const std::vector<float>& shaped,
+                            const std::vector<float>& smoothed)
+{
+    if (raw.size() < 3 || shaped.size() < 3 || smoothed.size() < 3)
+    {
+        return;
+    }
+    static auto last_log = std::chrono::steady_clock::time_point{};
+    const auto now = std::chrono::steady_clock::now();
+    if (last_log.time_since_epoch().count() != 0 && now - last_log < std::chrono::seconds(1))
+    {
+        return;
+    }
+    last_log = now;
+    std::cout << "[command_trace] source=" << source << " raw_units=" << raw_units
+              << " raw=[" << raw[0] << "," << raw[1] << "," << raw[2] << "]"
+              << " shaped_mps=[" << shaped[0] << "," << shaped[1] << "," << shaped[2] << "]"
+              << " smoothed_mps=[" << smoothed[0] << "," << smoothed[1] << "," << smoothed[2] << "]"
+              << std::endl;
 }
 
 } // namespace rl_command

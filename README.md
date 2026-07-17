@@ -6,44 +6,49 @@
 ![ROS 2](https://img.shields.io/badge/ROS%202-Humble-22314E?logo=ros&logoColor=white)
 ![CANFD](https://img.shields.io/badge/CANFD-gs__usb%201M%2F5M-0078D4)
 ![MuJoCo](https://img.shields.io/badge/MuJoCo-3.2.7-f06c2f)
-[![License](https://img.shields.io/badge/license-GPL--3.0-yellow)](https://github.com/NavBotHub/D1_rl_sar#)
 
 [中文版本](README_CN.md)
 
 > This D1 real-robot deployment guide is validated for Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, ROS 2 Humble, and DaMiao USB-CANFD.
 
-This document describes the real-robot deployment flow for D1 on Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, and ROS 2 Humble. The CAN bus uses a DaMiao `DM-USB2CANFD_Dual` dual-channel USB-CAN FD adapter, the IMU is `DM-IMU-L1`, and the leg motors are DaMiao `DM6248P`.
+This document describes the real-robot deployment flow for D1 on Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, and ROS 2 Humble. The CAN bus uses a DaMiao `DM-USB2CANFD_Dual` dual-channel USB-CAN FD adapter, the IMU is `DM-IMU-L1`, and the leg motors are DaMiao `DM6248P`. Policy training, checkpoint evaluation, and ONNX export are maintained in [D1 HIMLoco](https://gitee.com/lookc4/D1_himloco); this repository starts at deployment-contract validation and continues through MuJoCo and hardware integration.
+
+> [!CAUTION]
+> A policy produces joint targets that reach the actuators through the real-time control loop. Validate the checkpoint in HIMLoco and MuJoCo first. Suspend the robot for the first powered test, keep emergency power isolation within reach, and verify joint order, direction, zero position, IMU orientation, PD gains, CAN mapping, and the ONNX contract before any ground test.
 
 ## Table of Contents
 
-- [1. Scope and Requirements](#1-scope-and-requirements)
+- [1. Scope and Deployment Workflow](#1-scope-and-deployment-workflow)
 - [2. Flash JetPack 6.2.2](#2-flash-jetpack-622)
 - [3. First Boot, Network, and APT Sources](#3-first-boot-network-and-apt-sources)
 - [4. Repository Setup and Build](#4-repository-setup-and-build)
 - [5. USB-CANFD and gs_usb Driver](#5-usb-canfd-and-gs_usb-driver)
 - [6. Real Motor Parameters and Zero Calibration](#6-real-motor-parameters-and-zero-calibration)
 - [7. Real-Robot Runtime and Controls](#7-real-robot-runtime-and-controls)
-- [8. Optional MuJoCo Simulation](#8-optional-mujoco-simulation)
+- [8. Pre-Hardware MuJoCo Validation](#8-pre-hardware-mujoco-validation)
 - [9. Short Startup Checklist](#9-short-startup-checklist)
 - [10. FAQ](#10-faq)
 - [References](#references)
 
-## 1. Scope and Requirements
+## 1. Scope and Deployment Workflow
 
-### Verified Status
+### Deployment boundary
 
-| Status | Item |
-|---|---|
-| Verified | ROS 2 Humble workspace builds successfully |
-| Verified | `d1_description` has a valid ROS2 `package.xml` |
-| Verified | `rl_sar` builds the real-robot executables `rl_real_d1` and `rl_real_d1_trigger` |
-| Verified | `dm_imu_node` publishes `/imu/data` |
-| Verified | After flashing SocketCAN firmware, `DM-USB2CANFD_Dual` enumerates as `can1` / `can2` |
-| Verified | `5.15/gs_usb.ko` works for CAN FD on the Jetson 5.15 kernel |
-| Verified | `d1-gs-usb.service`, `d1-canfd@.service`, and udev rules auto-load and configure CAN FD |
-| Verified | `rl_real_d1` starts, FSM transitions work, and the ONNX policy loads |
-| Needs safe robot validation | Full CAN communication with real motors connected |
-| Needs safe robot validation | Suspended-robot stand-up, sit-down, and locomotion tests |
+```text
+D1 HIMLoco dataset and training
+              ↓
+Checkpoint evaluation and ONNX export
+              ↓
+RL-SAR deployment-contract check
+              ↓
+MuJoCo simulation and mapping check
+              ↓
+Suspended stand-up / get-down / low-command test
+              ↓
+Controlled ground acceptance
+```
+
+Do not infer hardware readiness from a successful build or ONNX load. Treat build checks, CAN loopback, suspended tests, and ground tests as separate gates and record their results outside this README.
 
 ### Hardware and System Requirements
 
@@ -231,7 +236,14 @@ Clone:
 ```bash
 mkdir -p ~/project
 cd ~/project
-git clone --recursive https://github.com/NavBotHub/D1_rl_sar
+git clone https://github.com/NavBotHub/D1_rl_sar.git
+cd ~/project/D1_rl_sar/rl_sar
+```
+
+If GitHub access is unavailable, use the Gitee mirror:
+
+```bash
+git clone https://gitee.com/lookc4/D1_rl_sar.git ~/project/D1_rl_sar
 cd ~/project/D1_rl_sar/rl_sar
 ```
 
@@ -343,7 +355,42 @@ cd ~/project/D1_rl_sar/rl_sar
 bash scripts/download_inference_runtime.sh onnx
 ```
 
-### 4.5 Build ROS2 Workspace
+### 4.5 Verify the HIMLoco ONNX Deployment Contract
+
+The deployed files are:
+
+```text
+rl_sar/policy/d1/base.yaml
+rl_sar/policy/d1/robot_lab/config.yaml
+rl_sar/policy/d1/robot_lab/policy_onnx.onnx
+```
+
+The current policy contract is:
+
+| Item | Required value or order |
+|---|---|
+| Observation frame | 45 values: `commands(3) + ang_vel(3) + gravity_vec(3) + dof_pos(12) + dof_vel(12) + actions(12)` |
+| Observation history | `[0,1,2,3,4,5]`, time-priority, with 0 as the latest frame |
+| ONNX input / output | 270 values (45 × 6) / 12 joint actions |
+| Timing | `dt=0.005 s`, `decimation=4`, policy period 0.02 s |
+| Joint order | FL, FR, RL, RR; hip, thigh, calf within each leg |
+| Default pose | Left legs `[-0.05,-0.75,-0.75]`; right legs `[0.05,-0.75,-0.75]` |
+| RL Kp / Kd | `[50,55,55]` / `[3.2,3.5,3.5]` per leg |
+| Action scale | `[0.35,0.55,0.80]` per leg |
+| Torque limit | 50 for each joint |
+
+Before replacing the model, compare the input and output shapes, history order, joint order, default pose, PD gains, action scale, torque behavior, timing, command shaping, and SHA256 of the exported and deployed ONNX files. A model must pass HIMLoco checkpoint evaluation and RL-SAR MuJoCo validation before a powered hardware test.
+
+`commands_scale: [2.0, 2.0, 0.25]` is observation normalization, not a physical command limit. The current pure-axis deployment envelope is `vx [-0.60,0.90] m/s`, `vy ±0.40 m/s`, and `wz ±0.50 rad/s`, with acceleration/deceleration limits of `1.6/2.4`, `1.2/1.8`, and `2.0/3.0` respectively. Diagonal and translation+yaw commands receive additional projection. The sole source of truth is `rl_sar/src/rl_sar/include/command_shaping.hpp`; wider dataset support never authorizes wider hardware commands.
+
+Record both hashes during handoff:
+
+```bash
+sha256sum <HIMLOCO_EXPORTED_POLICY>/policy_onnx.onnx
+sha256sum ~/project/D1_rl_sar/rl_sar/policy/d1/robot_lab/policy_onnx.onnx
+```
+
+### 4.6 Build ROS2 Workspace
 
 Regular ROS2 build:
 
@@ -386,7 +433,7 @@ Confirm these points:
 - `ros2 pkg executables dm_imu` shows `dm_imu_node`.
 - No output from `ldd ... | grep 'not found'` means required shared libraries are found.
 
-### 4.6 Source Setup Files Automatically
+### 4.7 Source Setup Files Automatically
 
 After a successful build, append ROS and workspace setup to `~/.bashrc`:
 
@@ -406,7 +453,7 @@ Apply it to the current terminal:
 source ~/.bashrc
 ```
 
-### 4.7 Verify IMU
+### 4.8 Verify IMU
 
 Serial permission:
 
@@ -700,6 +747,8 @@ After writing FLASH, physically power-cycle the motors, then run `set_zero_all` 
 
 ## 7. Real-Robot Runtime and Controls
 
+For every new ONNX model or deployment-parameter change, complete the validation in section 8 before running the commands in this section. The first powered run must still use a suspended robot and low commands.
+
 ### 7.1 Real-Robot Runtime
 
 Safety requirement: for the first run, suspend the robot and confirm an emergency stop method works before entering stand-up or locomotion states.
@@ -861,9 +910,9 @@ Watch for:
 - If `L1 OFF` does not work, first confirm `dog_usb_l1_button_bit:=8`. If the field BTN bit differs, change only this bit.
 - If `OFF` exits motor control but the next `ON` does not respond, first confirm `rl_real_d1_headless.launch.py` includes `OnProcessExit -> Shutdown`, and that `install_rl_sar_services.sh` has been rerun.
 
-## 8. Optional MuJoCo Simulation
+## 8. Pre-Hardware MuJoCo Validation
 
-MuJoCo is used for simulation or real-to-sim mapping checks. It is not part of the shortest real-robot deployment path.
+MuJoCo is the deployment gate between HIMLoco checkpoint evaluation and powered hardware testing. It checks policy loading, joint order, default pose, command direction, state transitions, and real-to-sim mapping without energizing the physical actuators.
 
 Download MuJoCo:
 
@@ -898,6 +947,8 @@ Run the normal scene:
 ./cmake_build/bin/rl_sim_mujoco d1 scene
 ```
 
+The D1 description also provides `d1`, `scene_flat`, and `scene_terrain` MJCF files. The second CLI argument is the filename without `.xml`; do not use a scene name absent from `rl_sar/src/rl_sar_zoo/d1_description/mjcf/`.
+
 Run the terrain scene:
 
 ```bash
@@ -925,9 +976,19 @@ Use this to check:
 - Whether each motor direction has the same sign and magnitude.
 - Whether CAN ID to FL / FR / RL / RR joint ordering is correct.
 
+Acceptance sequence for a new policy:
+
+1. Confirm ONNX loading and remain in Passive.
+2. Enter GetUp and check continuous interpolation to the configured default pose.
+3. Enter RL Locomotion with a zero command.
+4. Test small forward/backward, lateral, and yaw commands one axis at a time, then only mixed commands allowed by `command_shaping.hpp`.
+5. Complete GetDown and confirm the FSM returns to Passive.
+
+Stop the handoff if the pose jumps, a joint direction is reversed, output becomes non-finite, command direction is wrong, or simulated torque/action behavior is inconsistent with the deployment contract.
+
 ## 9. Short Startup Checklist
 
-Prerequisites: CANFD autoload is installed, and the workspace is built.
+Prerequisites: CANFD autoload is installed, the workspace is built, and the current ONNX has passed section 8.
 
 1. Suspend the robot before power-on.
 2. Connect IMU, USB-CANFD, and gamepad.
@@ -948,8 +1009,8 @@ ros2 launch rl_sar rl_real_d1.launch.py
 ```
 
 5. Press `0` first to enter GetUp.
-6. After confirming the pose is stable, press `1` to enter RLLocomotion.
-7. On abnormal behavior, press `P` or `LB + X` to return to Passive, then power off and inspect.
+6. After confirming the suspended pose is stable, press `1` to enter RLLocomotion and begin with a zero command.
+7. Use `9` or `B` for a controlled GetDown. On abnormal behavior, use `P` or `LB + X` to return to Passive, then isolate power and inspect.
 
 ## 10. FAQ
 
@@ -1030,5 +1091,9 @@ rm -rf cmake_build
 - NVIDIA SDK Manager Jetson Direct Flash: <https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson-direct-flash/index.html>
 - JetPack SDK 6.2.2: <https://developer.nvidia.com/embedded/jetpack-sdk-622>
 - usbipd-win WSL support: <https://github.com/dorssel/usbipd-win/wiki/WSL-support>
+- D1 HIMLoco training and ONNX export: <https://gitee.com/lookc4/D1_himloco>
 - Upstream RL-SAR: <https://github.com/fan-ziqi/rl_sar>
 - Project repository: <https://github.com/NavBotHub/D1_rl_sar>
+- Project Gitee mirror: <https://gitee.com/lookc4/D1_rl_sar>
+- RL-SAR framework license: [`rl_sar/LICENSE`](rl_sar/LICENSE) (Apache-2.0)
+- Jetson `gs_usb` driver source: [`5.15/gs_usb.c`](5.15/gs_usb.c) (GPL-2.0-only)

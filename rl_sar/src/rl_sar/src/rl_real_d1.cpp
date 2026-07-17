@@ -424,6 +424,8 @@ void RL_Real::GetSysJoystick()
         this->control.x = planar.x;
         this->control.y = planar.y;
         this->control.yaw = rl_command::ShapeYawCommand(rx);
+        this->raw_command_inputs_ = {ly, lx, rx};
+        this->command_input_source_ = "joystick_axes";
         this->sys_js_active = true;
     }
     else if (this->sys_js_active)
@@ -432,6 +434,7 @@ void RL_Real::GetSysJoystick()
         this->control.y = 0.0f;
         this->control.yaw = 0.0f;
         this->sys_js_active = false;
+        this->raw_command_inputs_.assign(3, 0.0f);
     }
 }
 
@@ -680,6 +683,8 @@ void RL_Real::ApplyDogUsbControl(bool emit_events)
         this->control.x = planar.x;
         this->control.y = planar.y;
         this->control.yaw = rl_command::ShapeYawCommand(static_cast<float>(state.yaw));
+        this->raw_command_inputs_ = {static_cast<float>(state.x), static_cast<float>(state.y), static_cast<float>(state.yaw)};
+        this->command_input_source_ = "dog_usb_axes";
     }
     else if (channel_owns || dog_safe || remote_timeout || !serial_connected)
     {
@@ -687,6 +692,7 @@ void RL_Real::ApplyDogUsbControl(bool emit_events)
         this->control.y = 0.0f;
         this->control.yaw = 0.0f;
         this->ResetCommandSmoothing();
+        this->raw_command_inputs_.assign(3, 0.0f);
     }
 
     if (!emit_events || !usb_fresh)
@@ -797,10 +803,20 @@ void RL_Real::RunModel()
         this->obs.ang_vel = this->robot_state.imu.gyroscope;
         this->ApplyDogUsbControl(false);
         std::vector<float> target_commands = {this->control.x, this->control.y, this->control.yaw};
+        std::vector<float> raw_trace = this->raw_command_inputs_;
+        std::string trace_source = this->command_input_source_;
+        std::string raw_units = trace_source.find("axes") != std::string::npos ? "normalized_axis" : "mps_radps";
+        if (trace_source == "control")
+        {
+            raw_trace = target_commands;
+        }
 #if !defined(USE_CMAKE)
         if (this->control.navigation_mode)
         {
             target_commands = {(float)this->cmd_vel.linear.x, (float)this->cmd_vel.linear.y, (float)this->cmd_vel.angular.z};
+            raw_trace = target_commands;
+            trace_source = "cmd_vel";
+            raw_units = "mps_radps";
         }
 #endif
         // Final safety net for keyboard/nav/abnormal command sources.
@@ -810,6 +826,7 @@ void RL_Real::RunModel()
             this->params.Get<float>("dt") * static_cast<float>(this->params.Get<int>("decimation")),
             1.0e-4f);
         this->obs.commands = this->SmoothCommands(target_commands, command_dt);
+        rl_command::LogCommandTrace(trace_source, raw_units, raw_trace, target_commands, this->obs.commands);
         this->obs.base_quat = this->robot_state.imu.quaternion;
         this->obs.dof_pos = this->robot_state.motor_state.q;
         this->obs.dof_vel = this->robot_state.motor_state.dq;
