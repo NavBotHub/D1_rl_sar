@@ -1,0 +1,58 @@
+# Copyright (c) 2024-2025 Ziqi Fan
+# SPDX-License-Identifier: Apache-2.0
+
+d1/robot_lab:
+  model_name: "policy_onnx.onnx"
+  num_observations: 45
+  observations: ["commands","ang_vel", "gravity_vec", "dof_pos", "dof_vel", "actions"]
+  observations_history: [0, 1, 2, 3, 4, 5] #[5, 4, 3, 2, 1, 0]  # 0 is the latest observation
+  observations_history_priority: "time"  # "time" or "term" priority
+  clip_obs: 100.0
+  clip_actions_lower: [-100.0, -100.0, -100.0,
+                       -100.0, -100.0, -100.0,
+                       -100.0, -100.0, -100.0,
+                       -100.0, -100.0, -100.0]
+  clip_actions_upper: [100.0, 100.0, 100.0,
+                       100.0, 100.0, 100.0,
+                       100.0, 100.0, 100.0,
+                       100.0, 100.0, 100.0]
+  rl_kp: [50.0, 55.0, 55.0,
+          50.0, 55.0, 55.0,
+          50.0, 55.0, 55.0,
+          50.0, 55.0, 55.0]
+  rl_kd: [3.2, 3.5, 3.5,
+          3.2, 3.5, 3.5,
+          3.2, 3.5, 3.5,
+          3.2, 3.5, 3.5]
+  fixed_kp: [50.0, 55.0, 55.0,
+             50.0, 55.0, 55.0,
+             50.0, 55.0, 55.0,
+             50.0, 55.0, 55.0]
+  fixed_kd: [3.2, 3.5, 3.5,
+             3.2, 3.5, 3.5,
+             3.2, 3.5, 3.5,
+             3.2, 3.5, 3.5]
+  num_of_dofs: 12
+  action_scale: [0.35, 0.55, 0.80,
+                 0.35, 0.55, 0.80,
+                 0.35, 0.55, 0.80,
+                 0.35, 0.55, 0.80]
+  wheel_indices: []
+  lin_vel_scale: 2.0
+  ang_vel_scale: 0.25
+  dof_pos_scale: 1.0
+  dof_vel_scale: 0.05
+  commands_scale: [2.0, 2.0, 0.25]
+  torque_limits: [50.0, 50.0, 50.0,
+                  50.0, 50.0, 50.0,
+                  50.0, 50.0, 50.0,
+                  50.0, 50.0, 50.0]
+
+                  
+  default_dof_pos: [-0.0500, -0.7500, -0.7500,
+                    0.0500, -0.7500, -0.7500,
+                   -0.0500, -0.7500, -0.7500,
+                    0.0500, -0.7500, -0.7500]
+
+  joint_mapping: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  

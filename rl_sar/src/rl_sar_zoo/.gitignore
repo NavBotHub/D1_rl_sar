@@ -1,0 +1,18 @@
+# CMake
+build
+devel
+logs
+install
+log
+.catkin_tools
+cmake_build
+
+# Python
+__pycache__
+
+# IDE
+.vscode
+
+# OS
+.DS_Store
+Thumbs.db
