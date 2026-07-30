@@ -1,4 +1,4 @@
-# D1 Jetson Orin USB-CANFD Deployment README
+# D1 Jetson Orin USB-CANFD Deployment
 
 ![Jetson](https://img.shields.io/badge/Jetson-Orin%20Nano-76B900?logo=nvidia&logoColor=white)
 ![JetPack](https://img.shields.io/badge/JetPack-6.2.2-76B900?logo=nvidia&logoColor=white)
@@ -11,7 +11,7 @@
 
 > This D1 real-robot deployment guide is validated for Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, ROS 2 Humble, and DaMiao USB-CANFD.
 
-This document describes the real-robot deployment flow for D1 on Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, and ROS 2 Humble. The CAN bus uses a DaMiao `DM-USB2CANFD_Dual` dual-channel USB-CAN FD adapter, the IMU is `DM-IMU-L1`, and the leg motors are DaMiao `DM6248P`. Policy training, checkpoint evaluation, and ONNX export are maintained in [D1 HIMLoco](https://gitee.com/lookc4/D1_himloco); this repository starts at deployment-contract validation and continues through MuJoCo and hardware integration.
+This document describes the real-robot deployment flow for D1 on Jetson Orin Nano Super, JetPack 6.2.2, Ubuntu 22.04, and ROS 2 Humble. The CAN bus uses a DaMiao `DM-USB2CANFD_Dual` dual-channel USB-CAN FD adapter, the IMU is `DM-IMU-L1`, and the leg motors are DaMiao `DM6248P`. Policy training, checkpoint evaluation, and ONNX export are maintained in [D1 HIMLoco](https://github.com/NavBotHub/D1_HIMLoco); this repository starts at deployment-contract validation and continues through MuJoCo and hardware integration.
 
 > [!CAUTION]
 > A policy produces joint targets that reach the actuators through the real-time control loop. Validate the checkpoint in HIMLoco and MuJoCo first. Suspend the robot for the first powered test, keep emergency power isolation within reach, and verify joint order, direction, zero position, IMU orientation, PD gains, CAN mapping, and the ONNX contract before any ground test.
@@ -237,13 +237,6 @@ Clone:
 mkdir -p ~/project
 cd ~/project
 git clone https://github.com/NavBotHub/D1_rl_sar.git
-cd ~/project/D1_rl_sar/rl_sar
-```
-
-If GitHub access is unavailable, use the Gitee mirror:
-
-```bash
-git clone https://gitee.com/lookc4/D1_rl_sar.git ~/project/D1_rl_sar
 cd ~/project/D1_rl_sar/rl_sar
 ```
 
@@ -1091,9 +1084,8 @@ rm -rf cmake_build
 - NVIDIA SDK Manager Jetson Direct Flash: <https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson-direct-flash/index.html>
 - JetPack SDK 6.2.2: <https://developer.nvidia.com/embedded/jetpack-sdk-622>
 - usbipd-win WSL support: <https://github.com/dorssel/usbipd-win/wiki/WSL-support>
-- D1 HIMLoco training and ONNX export: <https://gitee.com/lookc4/D1_himloco>
+- D1 HIMLoco training and ONNX export: <https://github.com/NavBotHub/D1_HIMLoco>
 - Upstream RL-SAR: <https://github.com/fan-ziqi/rl_sar>
 - Project repository: <https://github.com/NavBotHub/D1_rl_sar>
-- Project Gitee mirror: <https://gitee.com/lookc4/D1_rl_sar>
 - RL-SAR framework license: [`rl_sar/LICENSE`](rl_sar/LICENSE) (Apache-2.0)
 - Jetson `gs_usb` driver source: [`5.15/gs_usb.c`](5.15/gs_usb.c) (GPL-2.0-only)

@@ -53,6 +53,11 @@ RL_Real::RL_Real(int argc, char **argv)
     dog_usb_l1_exit_timeout_ms = ros2_node->declare_parameter<int>("dog_usb_l1_exit_timeout_ms", 8000);
     keyboard_enable = ros2_node->declare_parameter<bool>("keyboard_enable", true);
     sys_joystick_device = ros2_node->declare_parameter<std::string>("sys_joystick_device", "/dev/input/js0");
+    const bool navigation_mode_default =
+        ros2_node->declare_parameter<bool>("navigation_mode_default", false);
+    this->control.navigation_mode = navigation_mode_default;
+    std::cout << LOGGER::INFO << "Navigation mode initial state: "
+              << (this->control.navigation_mode ? "ON" : "OFF") << std::endl;
     if (dog_usb_timeout_ms < 1) {dog_usb_timeout_ms = 300;}
     if (dog_remote_timeout_ms < 1) {dog_remote_timeout_ms = 1500;}
     if (dog_usb_l1_button_bit < 0 || dog_usb_l1_button_bit > 15) {dog_usb_l1_button_bit = 8;}

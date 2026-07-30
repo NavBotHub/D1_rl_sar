@@ -36,6 +36,7 @@ def generate_launch_description():
             'dog_usb_l1_exit_timeout_ms': ParameterValue(LaunchConfiguration('dog_usb_l1_exit_timeout_ms'), value_type=int),
             'keyboard_enable': ParameterValue(LaunchConfiguration('keyboard_enable'), value_type=bool),
             'sys_joystick_device': LaunchConfiguration('sys_joystick_device'),
+            'navigation_mode_default': ParameterValue(LaunchConfiguration('navigation_mode_default'), value_type=bool),
         }],
     )
 
@@ -104,6 +105,11 @@ def generate_launch_description():
             'sys_joystick_device',
             default_value='/dev/input/js0',
             description='Linux joystick device path for rl_real_d1'
+        ),
+        DeclareLaunchArgument(
+            'navigation_mode_default',
+            default_value='false',
+            description='Initial state for cmd_vel navigation control'
         ),
 
         dm_imu_node,

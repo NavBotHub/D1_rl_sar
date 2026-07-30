@@ -1,4 +1,4 @@
-# D1 Jetson Orin USB-CANFD 真机部署 README
+# D1 Jetson Orin USB-CANFD 真机部署
 
 ![Jetson](https://img.shields.io/badge/Jetson-Orin%20Nano-76B900?logo=nvidia&logoColor=white)
 ![JetPack](https://img.shields.io/badge/JetPack-6.2.2-76B900?logo=nvidia&logoColor=white)
@@ -11,7 +11,7 @@
 
 > 本文 D1 真机部署流程按 Jetson Orin Nano Super、JetPack 6.2.2、Ubuntu 22.04、ROS 2 Humble、达妙 USB-CANFD 验证。
 
-本文是 D1 真机部署手册，目标平台为 Jetson Orin Nano Super、JetPack 6.2.2、Ubuntu 22.04、ROS 2 Humble。通信方案使用达妙 `DM-USB2CANFD_Dual` 双路 USB-CAN FD，IMU 使用 `DM-IMU-L1`，腿部电机使用达妙 `DM6248P`。策略训练、checkpoint 验收和 ONNX 导出由 [D1 HIMLoco](https://gitee.com/lookc4/D1_himloco) 维护；本仓库从部署契约核对开始，继续完成 MuJoCo 和真机集成。
+本文是 D1 真机部署手册，目标平台为 Jetson Orin Nano Super、JetPack 6.2.2、Ubuntu 22.04、ROS 2 Humble。通信方案使用达妙 `DM-USB2CANFD_Dual` 双路 USB-CAN FD，IMU 使用 `DM-IMU-L1`，腿部电机使用达妙 `DM6248P`。策略训练、checkpoint 验收和 ONNX 导出由 [D1 HIMLoco](https://github.com/NavBotHub/D1_HIMLoco) 维护；本仓库从部署契约核对开始，继续完成 MuJoCo 和真机集成。
 
 > [!CAUTION]
 > 策略输出的关节目标会通过实时控制环发送到电机。必须先在 HIMLoco 和 MuJoCo 中验收 checkpoint；首次通电测试必须吊起机器人，保持急停和断电手段可立即操作，并在落地前核对关节顺序、方向、零位、IMU 方向、PD、CAN 映射和完整 ONNX 契约。
@@ -237,13 +237,6 @@ sudo reboot
 mkdir -p ~/project
 cd ~/project
 git clone https://github.com/NavBotHub/D1_rl_sar.git
-cd ~/project/D1_rl_sar/rl_sar
-```
-
-如果 GitHub 访问不便，可使用 Gitee 镜像：
-
-```bash
-git clone https://gitee.com/lookc4/D1_rl_sar.git ~/project/D1_rl_sar
 cd ~/project/D1_rl_sar/rl_sar
 ```
 
@@ -1108,9 +1101,8 @@ rm -rf cmake_build
 - NVIDIA SDK Manager Jetson Direct Flash: <https://docs.nvidia.com/sdk-manager/install-with-sdkm-jetson-direct-flash/index.html>
 - JetPack SDK 6.2.2: <https://developer.nvidia.com/embedded/jetpack-sdk-622>
 - usbipd-win WSL support: <https://github.com/dorssel/usbipd-win/wiki/WSL-support>
-- D1 HIMLoco 训练与 ONNX 导出：<https://gitee.com/lookc4/D1_himloco>
+- D1 HIMLoco 训练与 ONNX 导出：<https://github.com/NavBotHub/D1_HIMLoco>
 - Upstream RL-SAR: <https://github.com/fan-ziqi/rl_sar>
 - 项目仓库：<https://github.com/NavBotHub/D1_rl_sar>
-- 项目 Gitee 镜像：<https://gitee.com/lookc4/D1_rl_sar>
 - RL-SAR 框架许可证：[`rl_sar/LICENSE`](rl_sar/LICENSE)（Apache-2.0）
 - Jetson `gs_usb` 驱动源码：[`5.15/gs_usb.c`](5.15/gs_usb.c)（GPL-2.0-only）
