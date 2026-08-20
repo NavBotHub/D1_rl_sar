@@ -16,17 +16,17 @@
 namespace rl_command
 {
 constexpr float kBackwardCommandLimit = -0.4f;
-constexpr float kForwardCommandLimit = 0.5f;
+constexpr float kForwardCommandLimit = 0.4f;
 constexpr float kLateralCommandLimit = 0.4f;
 constexpr float kYawCommandLimit = 0.5f;
 constexpr float kYawStartCommand = 0.2f;
 constexpr float kYawInputDeadband = 0.02f;
-constexpr float kForwardDiagonalXLimit = 0.5f;
+constexpr float kForwardDiagonalXLimit = 0.4f;
 constexpr float kForwardDiagonalYLimit = 0.35f;
 constexpr float kBackwardDiagonalXLimit = 0.4f;
 constexpr float kBackwardDiagonalYLimit = 0.25f;
 constexpr float kDiagonalActivationThreshold = 0.05f;
-constexpr float kMixedYawForwardXLimit = 0.5f;
+constexpr float kMixedYawForwardXLimit = 0.4f;
 constexpr float kMixedYawForwardYawLimit = 0.5f;
 // Keep backward mixed-yaw disabled under the narrowed -0.4 m/s envelope until
 // an accepted training anchor inside the new range is audited.
