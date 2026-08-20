@@ -208,7 +208,8 @@ class Motor_Control
 {
  public:
     Can_control_Mode current_can_mode_;  // Add member variable
-    Motor_Control(std::string bus_name,std::vector<DmActData> *data_ptr,Can_control_Mode can_mode);
+    Motor_Control(std::string bus_name,std::vector<DmActData> *data_ptr,
+                  Can_control_Mode can_mode, bool auto_enable = true);
     ~Motor_Control();
 
     void canframeCallback(const canfd_frame& frame); 

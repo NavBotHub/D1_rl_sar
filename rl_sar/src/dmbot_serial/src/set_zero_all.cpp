@@ -4,8 +4,8 @@
 //   * can1 = front 6 motors, CAN ID 0x01..0x06 (DM6248P, MIT mode)
 //   * can2 = rear 6 motors, CAN ID 0x01..0x06 (DM6248P, MIT mode)
 //
-// control_mit() is never called; only after the user explicitly presses y will it send
-// set_zero_position() and save_motor_param().
+// The motors remain disabled throughout calibration. Only after the user explicitly
+// presses y will the tool send set_zero_position() and save_motor_param().
 
 #include "dmbot_serial/protocol/damiao.h"
 
@@ -106,13 +106,13 @@ int main()
               << "  [2] All 12 joints have been moved to the URDF mechanical zero position\n"
               << "  [3] can1 and can2 are both UP (check with ip -brief link)\n"
               << "  [4] rl_real_d1 / test_motor is not running\n";
-    std::cout << "\nThis tool never calls control_mit(); the procedure is:\n"
-              << "  [1/6] Open can1 + can2 (automatically enables motors, but outputs no torque)\n"
+    std::cout << "\nThis tool keeps all motors disabled; the procedure is:\n"
+              << "  [1/6] Open can1 + can2 and explicitly disable all motors\n"
               << "  [2/6] Read current positions -> user confirmation\n"
-              << "  [3/6] Send set_zero_position to all 12 motors (RAM only)\n"
+              << "  [3/6] Send set_zero_position while disabled (RAM only)\n"
               << "  [4/6] Read positions again -> all should be approximately 0\n"
               << "  [5/6] Write to FLASH (requires confirmation; persists across power cycles)\n"
-              << "  [6/6] Re-enable and final verify -> values should still be approximately 0\n\n";
+              << "  [6/6] Final verify while disabled -> values should still be approximately 0\n\n";
 
     if (!ask_yes("Continue?")) {
         std::cout << "[Canceled] User aborted.\n";
@@ -137,10 +137,13 @@ int main()
             });
         }
 
-        std::cout << "\n[1/6] Opening can1 and automatically enabling the front 6 motors...\n" << std::flush;
-        auto can1 = std::make_shared<damiao::Motor_Control>("can1", &can1_init, damiao::canfd);
-        std::cout << "[1/6] Opening can2 and automatically enabling the rear 6 motors...\n" << std::flush;
-        auto can2 = std::make_shared<damiao::Motor_Control>("can2", &can2_init, damiao::canfd);
+        std::cout << "\n[1/6] Opening can1 with automatic enable disabled...\n" << std::flush;
+        auto can1 = std::make_shared<damiao::Motor_Control>("can1", &can1_init, damiao::canfd, false);
+        can1->disable_all();
+
+        std::cout << "[1/6] Opening can2 with automatic enable disabled...\n" << std::flush;
+        auto can2 = std::make_shared<damiao::Motor_Control>("can2", &can2_init, damiao::canfd, false);
+        can2->disable_all();
 
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         warmup_read(*can1, *can2);
@@ -157,7 +160,7 @@ int main()
             return 0;
         }
 
-        std::cout << "\n[3/6] Sending set_zero_position to all 12 motors...\n" << std::flush;
+        std::cout << "\n[3/6] Sending set_zero_position to all 12 disabled motors...\n" << std::flush;
         for (int i = 1; i <= 6; ++i) {
             if (auto m = can1->getMotor(static_cast<uint16_t>(i))) can1->set_zero_position(*m);
             usleep(5000);
@@ -179,7 +182,7 @@ int main()
             return 0;
         }
 
-        std::cout << "\n[5/6] Writing to FLASH (each motor is briefly disabled for about 110 ms x 12 ~= 1.4 s)...\n" << std::flush;
+        std::cout << "\n[5/6] Writing to FLASH while all motors remain disabled (about 110 ms x 12 ~= 1.4 s)...\n" << std::flush;
         for (int i = 1; i <= 6; ++i) {
             if (auto m = can1->getMotor(static_cast<uint16_t>(i))) can1->save_motor_param(*m);
         }
@@ -188,13 +191,10 @@ int main()
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        std::cout << "\n[6/6] Re-enabling and performing final verification...\n" << std::flush;
-        can1->enable_all(damiao::MIT_MODE);
-        can2->enable_all(damiao::MIT_MODE);
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        std::cout << "\n[6/6] Performing final verification while motors remain disabled...\n" << std::flush;
         warmup_read(*can1, *can2, 3, 150);
 
-        print_positions_table("After FLASH write (verified)", *can1, *can2);
+        print_positions_table("After FLASH write while disabled (verified)", *can1, *can2);
 
         std::cout << "\n[Done] If all 12 values above are approximately 0, the zero positions were written to FLASH successfully.\n"
                   << "       Later, power-cycle the motors and run this tool again to check the [2/6] output.\n"

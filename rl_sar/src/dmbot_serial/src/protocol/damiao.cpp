@@ -105,7 +105,8 @@ bool Motor::is_have_param(int key) const
 }
 
 /******one CAN bus, one Motor_Control**********************/
-Motor_Control::Motor_Control(std::string bus_name,std::vector<DmActData> *data_ptr,Can_control_Mode can_mode)
+Motor_Control::Motor_Control(std::string bus_name,std::vector<DmActData> *data_ptr,
+                             Can_control_Mode can_mode, bool auto_enable)
     :  data_ptr_(data_ptr) ,current_can_mode_(can_mode)
 {
     uint16_t motor_mode;
@@ -122,7 +123,10 @@ Motor_Control::Motor_Control(std::string bus_name,std::vector<DmActData> *data_p
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-    enable_all(motor_mode);//Enable all motors on this interface
+    if (auto_enable)
+    {
+        enable_all(motor_mode);//Enable all motors on this interface
+    }
     //usleep(1000000);//1s
     std::cout<<"Motor_Control init success!"<<std::endl;
 }
