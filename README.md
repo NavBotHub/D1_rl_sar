@@ -81,7 +81,7 @@ When flashing Jetson Orin Nano Super for the first time, enter Recovery mode bef
 
 The image below marks the `Recovery` button used for flashing mode:
 
-![Jetson Orin carrier board Recovery button](docs/images/jetson_orin_carrier_board_recovery.png)
+![Jetson Orin carrier board Recovery button](docs/images/jetson_orin_carrier_board_recovery_en.png)
 
 Note: Recovery mode is only needed for flashing. For normal robot operation, power on directly without holding `Recovery`.
 
